@@ -1,0 +1,391 @@
+---
+title: "Study 2 Analysis"
+output: pdf_document
+date: "2025-05-01"
+---
+
+```{r setup, include=FALSE}
+library(psych)    
+library(ggplot2)
+library(reshape2)
+knitr::opts_chunk$set(echo = TRUE)
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+```
+
+Data cleaning to remove all observations with no valid actual vote record:
+```{r}
+df <- read.csv('replication_2012_2020.csv')
+
+df$republican_actual[df$actual_vote == 1] <- 0
+df$republican_actual[df$actual_vote == 2] <- 1
+
+df$republican_gpt[df$republican >0.5] <- 1
+df$republican_gpt[df$republican <0.5] <- 0
+
+df[, 6:16][df[, 6:16] < 0] <- NA
+
+#only keep rows with actual vote data
+#checked to make sure that each year's gpt-3 observations equal that of the
+#authors' after cleaning
+df=df[!is.na(df$republican_actual),]
+
+#arrange model order
+df$model <- factor(df$model, levels = c("gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4"))
+```
+
+
+We first replicate the authors' proportions test for all models  
+```{r}
+year <- c("2012", "2016", "2020")
+model <- c("gpt-3", "gpt-3.5-turbo", "gpt-4o-mini",'gpt-4') 
+
+proportion_results <- data.frame(
+  year = numeric(),
+  model = character(),
+  republican_actual = numeric(),
+  republican_gpt = numeric(),
+  p_value = numeric()
+)
+
+for (y in as.numeric(year)) {
+  for (m in model) {
+    # Subset the data
+    temp <- df[df$year == y & df$model == m, ]
+      
+    prop_test <- prop.test(x = c(sum(temp$republican_actual, na.rm = TRUE), sum(temp$republican_gpt, na.rm = TRUE)), 
+                          n = c(nrow(temp[!is.na(temp$republican_actual), ]), nrow(temp[!is.na(temp$republican_gpt), ])))
+    p_value <- prop_test$p.value
+    
+    prop_republican_actual <- sum(temp$republican_actual, na.rm = TRUE)/sum(!is.na(temp$republican_actual))
+    prop_republican_predict <-sum(temp$republican_gpt, na.rm = TRUE)/sum(!is.na(temp$republican_gpt))
+    
+    proportion_results <- rbind(proportion_results, data.frame(
+          year = y,
+          model = m,
+          republican_actual = prop_republican_actual,
+          republican_gpt = prop_republican_predict,
+          p_value = p_value
+        ))
+      
+    cat(sprintf("%s_%s:\n", y, m))
+    print(prop_test)
+    } 
+}
+proportion_results
+
+```
+```{r}
+#subset on models with high proportion agreement (high p-value)
+proportion_results[proportion_results$p_value > 0.05,]
+```
+
+We observe that the proportion of agreement is higher for the more advanced models for the 2012 and 2016 elections, but they appear to overpredict support for the Republican candidate in the 2020 election.  
+
+
+We now evaluate the performance for each model for each year:
+```{r}
+year_model_scores_result <- data.frame(
+  year = numeric(),
+  model = character(),
+  proportion = numeric(),
+  tetrachoric = numeric(),
+  ICC = numeric(),
+  kappa = numeric(),
+  f1 = numeric())
+
+for(y in as.numeric(year)){
+  for (m in model) {
+    temp <- df[df$year == y & df$model == m, ]
+    proportion <- round(prop.table(table(temp$republican_actual, temp$republican_gpt))[4]+prop.table(table(temp$republican_actual, temp$republican_gpt))[1], digits=2)
+    tetrachoric <- round(tetrachoric(cbind(temp$republican_actual, temp$republican_gpt))$rho[2], digits=2)
+    ICC <- round(min(ICC(cbind(temp$republican_actual, temp$republican_gpt))$results$ICC[4:6]), digits=2)
+    kappa <- round(cohen.kappa(cbind(temp$republican_actual, temp$republican_gpt))$kappa, digits=2)
+    #for f-1 score
+    conf_matrix <- table(temp$republican_actual, temp$republican_gpt)
+    TP <- conf_matrix[2, 2]  
+    FP <- conf_matrix[1, 2] 
+    FN <- conf_matrix[2, 1] 
+    precision <- if (TP + FP > 0) TP / (TP + FP) else 0
+    recall <- if (TP + FN > 0) TP / (TP + FN) else 0
+    f1 <- if (precision + recall > 0) round(2 * (precision * recall) / (precision + recall), digits=2)
+    
+    year_model_scores_result <- rbind(year_model_scores_result, data.frame(
+        year = y,
+        model = m,
+        proportion = proportion,
+        tetrachoric = tetrachoric,
+        kappa = kappa,
+        ICC = ICC,
+        f1 = f1
+      ))
+      } 
+  }
+
+year_model_scores_result
+```
+
+Graphing:
+```{r}
+year_model_plot <- data.frame(
+  year = c(2012, 2012, 2012, 2012, 2016, 2016, 2016, 2016, 2020, 2020, 2020, 2020),
+  model = c("gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4", "gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4", "gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4"),
+  proportion = year_model_scores_result$proportion,
+  tetrachoric = year_model_scores_result$tetrachoric,
+  kappa = year_model_scores_result$kappa,
+  ICC = year_model_scores_result$ICC,
+  f1 = year_model_scores_result$f1
+)
+
+#reorder model
+year_model_plot$model <- factor(year_model_plot$model, 
+                                levels = c("gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4"))
+
+year_model_plot <- melt(year_model_plot, id.vars = c("year", "model"), variable.name = "metric", value.name = "value")
+
+metrics <- c("proportion", "tetrachoric", "kappa", "ICC", "f1")
+
+ggplot(year_model_plot, aes(x = year, y = value, color = model, group = model)) +
+  geom_line() + 
+  geom_point() + 
+  facet_wrap(~ metric, scales = "free_y") + 
+  labs(title = "Model Performance Metrics Across Years",
+       x = "Year",
+       y = "",
+       color = "Model") +
+  scale_fill_brewer(palette = "Set1") +
+  scale_x_continuous(breaks = c(2012, 2016, 2020)) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+The three advanced models outperformed gpt-3 for the 2012 election on all five measures, while gpt-3.5-turbo and gpt-4o-mini outperformed gpt-3 in the 2016 election. gpt-3 retained the highest performance in the 2020 election.  
+
+Compare across models for all years: 
+```{r}
+model_scores_result <- data.frame(
+  model = character(),
+  proportion = numeric(),
+  tetrachoric = numeric(),
+  kappa = numeric(),
+  ICC = numeric(),
+  f1 = numeric())
+
+
+for (m in model) {
+    temp <- df[df$model == m, ]
+    proportion <- round(prop.table(table(temp$republican_actual, temp$republican_gpt))[4]+prop.table(table(temp$republican_actual, temp$republican_gpt))[1], digits=2)
+    tetrachoric <- round(tetrachoric(cbind(temp$republican_actual, temp$republican_gpt))$rho[2], digits=2)
+    kappa <- round(cohen.kappa(cbind(temp$republican_actual, temp$republican_gpt))$kappa, digits=2)
+    ICC <- round(min(ICC(cbind(temp$republican_actual, temp$republican_gpt))$results$ICC[4:6]), digits=2)
+    #for f-1 score
+    conf_matrix <- table(temp$republican_actual, temp$republican_gpt)
+    TP <- conf_matrix[2, 2]  
+    FP <- conf_matrix[1, 2] 
+    FN <- conf_matrix[2, 1] 
+    precision <- if (TP + FP > 0) TP / (TP + FP) else 0
+    recall <- if (TP + FN > 0) TP / (TP + FN) else 0
+    f1 <- if (precision + recall > 0) round(2 * (precision * recall) / (precision + recall), digits=2)
+    
+    model_scores_result <- rbind(model_scores_result, data.frame(
+        model = m,
+        proportion = proportion,
+        tetrachoric = tetrachoric,
+        kappa = kappa,
+        ICC = ICC,
+        f1 = f1
+      ))
+}
+
+model_scores_result
+```
+
+```{r}
+model_scores_result <- data.frame(
+  model = c("gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4"),
+  proportion = model_scores_result$proportion,
+  tetrachoric = model_scores_result$tetrachoric,
+  kappa = model_scores_result$kappa,
+  ICC = model_scores_result$ICC,
+  f1 = model_scores_result$f1
+)
+
+# melt the data for easier plotting with ggplot2
+model_plot <- melt(model_scores_result, id.vars = "model", variable.name = "metric", value.name = "value")
+
+model_plot$model <- factor(model_plot$model, 
+                                levels = c("gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4"))
+
+# Create a single faceted bar graph
+model_plot %>% ggplot(aes(x = model, y = value, fill = model)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ metric, ncol = 3) +  
+  labs(title = "Comparison of Metrics Across Models",
+       x = "",
+       y = "",
+       fill = "Model") +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  theme(legend.position = "none",  
+        strip.text = element_text(size = 10),  
+        axis.text.x = element_text(angle = 45, hjust = 1))  
+```
+The advanced models achieved marginally higher performance across all criteria. 
+
+Compare metrics across years
+```{r}
+year_scores_result <- data.frame(
+  year = numeric(),
+  proportion = numeric(),
+  tetrachoric = numeric(),
+  kappa = numeric(),
+  ICC = numeric(),
+  f1 = numeric())
+
+
+for (y in year) {
+    temp <- df[df$year == y, ]
+    proportion <- round(prop.table(table(temp$republican_actual, temp$republican_gpt))[4]+prop.table(table(temp$republican_actual, temp$republican_gpt))[1], digits=2)
+    tetrachoric <- round(tetrachoric(cbind(temp$republican_actual, temp$republican_gpt))$rho[2], digits=2)
+    kappa <- round(cohen.kappa(cbind(temp$republican_actual, temp$republican_gpt))$kappa, digits=2)
+    ICC <- round(min(ICC(cbind(temp$republican_actual, temp$republican_gpt))$results$ICC[4:6]), digits=2)
+    #for f-1 score
+    conf_matrix <- table(temp$republican_actual, temp$republican_gpt)
+    TP <- conf_matrix[2, 2]  
+    FP <- conf_matrix[1, 2] 
+    FN <- conf_matrix[2, 1] 
+    precision <- if (TP + FP > 0) TP / (TP + FP) else 0
+    recall <- if (TP + FN > 0) TP / (TP + FN) else 0
+    f1 <- if (precision + recall > 0) round(2 * (precision * recall) / (precision + recall), digits=2)
+    
+    year_scores_result <- rbind(year_scores_result, data.frame(
+        year = y,
+        proportion = proportion,
+        tetrachoric = tetrachoric,
+        kappa = kappa,
+        ICC = ICC,
+        f1 = f1
+      ))
+}
+
+year_scores_result
+```
+
+```{r}
+#graphing
+year_plot <- data.frame(
+  year = c(2012, 2016, 2020),
+  proportion = year_scores_result$proportion,
+  tetrachoric = year_scores_result$tetrachoric,
+  kappa = year_scores_result$kappa,
+  ICC = year_scores_result$ICC,
+  f1 = year_scores_result$f1
+)
+
+# melt data
+year_plot <- melt(year_plot, id.vars = "year", variable.name = "metric", value.name = "value")
+
+# Create a single faceted bar graph
+year_plot %>% ggplot(aes(x = factor(year), y = value, fill = factor(year))) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~ metric, ncol = 3) +  
+  labs(title = "Comparison of Metrics Across Years",
+       x = '',
+       y = '') +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  theme(legend.position = "")  
+
+```
+All years are similarly predictable. 
+
+
+The authors mentioned that the voting behavior of independents are especially difficult to predict. Let's examine if the more advanced models can do a better job
+```{r}
+#subset sample to only include independents
+indep <- df %>% filter(party_id == 4)
+
+indep_result <- data.frame(
+  year = numeric(),
+  model = character(),
+  proportion = numeric(),
+  tetrachoric = numeric(),
+  ICC = numeric(),
+  kappa = numeric(),
+  f1 = numeric())
+
+for(y in as.numeric(year)){
+  for (m in model) {
+    temp <- indep[indep$year == y & indep$model == m, ]
+    proportion <- round(prop.table(table(temp$republican_actual, temp$republican_gpt))[4]+prop.table(table(temp$republican_actual, temp$republican_gpt))[1], digits=2)
+    tetrachoric <- round(tetrachoric(cbind(temp$republican_actual, temp$republican_gpt))$rho[2], digits=2)
+    ICC <- round(min(ICC(cbind(temp$republican_actual, temp$republican_gpt))$results$ICC[4:6]), digits=2)
+    kappa <- round(cohen.kappa(cbind(temp$republican_actual, temp$republican_gpt))$kappa, digits=2)
+    #for f-1 score
+    conf_matrix <- table(temp$republican_actual, temp$republican_gpt)
+    TP <- conf_matrix[2, 2]  
+    FP <- conf_matrix[1, 2] 
+    FN <- conf_matrix[2, 1] 
+    precision <- if (TP + FP > 0) TP / (TP + FP) else 0
+    recall <- if (TP + FN > 0) TP / (TP + FN) else 0
+    f1 <- if (precision + recall > 0) round(2 * (precision * recall) / (precision + recall), digits=2)
+    
+    indep_result <- rbind(indep_result, data.frame(
+        year = y,
+        model = m,
+        proportion = proportion,
+        tetrachoric = tetrachoric,
+        kappa = kappa,
+        ICC = ICC,
+        f1 = f1
+      ))
+      } 
+  }
+
+indep_result
+
+```
+
+```{r}
+indep_year_model_plot <- data.frame(
+  year = c(2012, 2012, 2012, 2012, 2016, 2016, 2016, 2016, 2020, 2020, 2020, 2020),
+  model = c("gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4", "gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4", "gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4"),
+  proportion = indep_result$proportion,
+  tetrachoric = indep_result$tetrachoric,
+  kappa = indep_result$kappa,
+  ICC = indep_result$ICC,
+  f1 = indep_result$f1
+)
+
+#reorder model
+indep_year_model_plot$model <- factor(indep_year_model_plot$model, 
+                                levels = c("gpt-3", "gpt-3.5-turbo", "gpt-4o-mini", "gpt-4"))
+
+indep_year_model_plot <- melt(indep_year_model_plot, id.vars = c("year", "model"), variable.name = "metric", value.name = "value")
+
+metrics <- c("proportion", "tetrachoric", "kappa", "ICC", "f1")
+
+ggplot(indep_year_model_plot, aes(x = year, y = value, color = model, group = model)) +
+  geom_line() + 
+  geom_point() + 
+  facet_wrap(~ metric, scales = "free_y") + 
+  labs(title = "Model Performance Metrics Across Years",
+       x = "Year",
+       y = "",
+       color = "Model") +
+  scale_fill_brewer(palette = "Set1") +
+  scale_x_continuous(breaks = c(2012, 2016, 2020)) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+gpt-4o-mini consistently outperforms gpt-3 across all metrics for the 2012 and 2016 elections, while gpt-3.5-turbo outperforms the baseline in the first two elections.
+
+
+
+
+
+
+
+
+
