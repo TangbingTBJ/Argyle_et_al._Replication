@@ -1,0 +1,1944 @@
+---
+title: "Study 3 Replication"
+output: pdf_document
+date: "2025-05-08"
+---
+
+```{r setup, include=FALSE}
+library(psych)   
+library(caret)
+library(ggplot2)
+library(reshape2)
+library(xtable)
+library(tidyverse)
+library(tidyverse)
+knitr::opts_chunk$set(echo = TRUE)
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+```
+
+load data for each target variable:
+```{r}
+load_csvs <- function(target_var) {
+  files <- list.files(pattern = paste0("^", target_var, ".*\\.csv$"), full.names = TRUE)
+  
+  for (f in files) {
+    name_raw <- tools::file_path_sans_ext(basename(f))
+    var_name <- gsub("[-\\.]", "_", name_raw)
+    assign(var_name, read.csv(f), envir = .GlobalEnv)
+  }
+}
+
+load_csvs('political_interest')
+load_csvs('discuss_politics')
+load_csvs('church_goer')
+```
+
+combine all dataframes predicting the same target variable in the same year
+```{r}
+combine_predictions <- function(target_var,year) {
+  if (target_var == 'political_interest' & year == 2012){
+    df_3_5 <- political_interest_gpt_3_5_turbo_2012_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- political_interest_gpt_4o_mini_2012_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- political_interest_gpt_4_2012_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  if (target_var == 'political_interest' & year == 2016){
+    df_3_5 <- political_interest_gpt_3_5_turbo_2016_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- political_interest_gpt_4o_mini_2016_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- political_interest_gpt_4_2016_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  if (target_var == 'political_interest' & year == 2020){
+    df_3_5 <- political_interest_gpt_3_5_turbo_2020_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- political_interest_gpt_4o_mini_2020_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- political_interest_gpt_4_2020_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  if (target_var == 'discuss_politics' & year == 2012){
+    df_3_5 <- discuss_politics_gpt_3_5_turbo_2012_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- discuss_politics_gpt_4o_mini_2012_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- discuss_politics_gpt_4_2012_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  if (target_var == 'discuss_politics' & year == 2016){
+    df_3_5 <- discuss_politics_gpt_3_5_turbo_2016_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- discuss_politics_gpt_4o_mini_2016_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- discuss_politics_gpt_4_2016_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  if (target_var == 'discuss_politics' & year == 2020){
+    df_3_5 <- discuss_politics_gpt_3_5_turbo_2020_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- discuss_politics_gpt_4o_mini_2020_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- discuss_politics_gpt_4_2020_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  if (target_var == 'church_goer' & year == 2012){
+    df_3_5 <- church_goer_gpt_3_5_turbo_2012_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- church_goer_gpt_4o_mini_2012_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- church_goer_gpt_4_2012_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  if (target_var == 'church_goer' & year == 2016){
+    df_3_5 <- church_goer_gpt_3_5_turbo_2016_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- church_goer_gpt_4o_mini_2016_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- church_goer_gpt_4_2016_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  if (target_var == 'church_goer' & year == 2020){
+    df_3_5 <- church_goer_gpt_3_5_turbo_2020_results %>% mutate(model_name = 'gpt_3_5_turbo')
+    
+    df_4o <- church_goer_gpt_4o_mini_2020_results
+    df_4o <- df_4o %>% mutate(model_name = 'gpt_4o_mini')
+    
+    df_4 <- church_goer_gpt_4_2020_results
+    df_4 <- df_4 %>% mutate(model_name = 'gpt_4')
+  }
+  
+  df <- rbind(df_3_5, df_4o, df_4)
+  return (df)
+} 
+
+political_interest_2012 <- combine_predictions('political_interest',2012)
+political_interest_2016 <- combine_predictions('political_interest',2016)
+political_interest_2020 <-combine_predictions('political_interest',2020)
+
+discuss_politics_2012 <- combine_predictions('discuss_politics',2012)
+discuss_politics_2016 <- combine_predictions('discuss_politics',2016)
+discuss_politics_2020 <- combine_predictions('discuss_politics',2020)
+
+church_goer_2012 <- combine_predictions('church_goer',2012)
+church_goer_2016 <- combine_predictions('church_goer',2016)
+church_goer_2020 <- combine_predictions('church_goer',2020)
+```
+
+rename variables:
+```{r}
+col_names_12_16 <- c('id','gender','race','age','education','church_goer','patriotism','discuss_politics','political_interest','ideology','pid3','pid7','voted','vote_choice','gpt_coded_response','model_name')
+col_names_20 <- c('id','gender','race','age','education','church_goer','discuss_politics','political_interest','ideology','pid3','pid7','voted','vote_choice','gpt_coded_response','model_name')
+
+df_names <- c(
+  "political_interest_2012", "political_interest_2016", "political_interest_2020",
+  "discuss_politics_2012", "discuss_politics_2016", "discuss_politics_2020",
+  "church_goer_2012", "church_goer_2016", "church_goer_2020"
+)
+
+for (df in df_names) {
+  year <- as.numeric(sub(".*_(\\d{4})$", "\\1", df))
+  new_names <- if (year == 2020) col_names_20 else col_names_12_16
+  temp <- get(df)
+  names(temp) <- new_names
+  assign(df, temp, envir = .GlobalEnv)
+} 
+```
+
+
+load in and merge the authors' 2016 results using gpt-3 for comparisons: 
+```{r}
+author_original <- read.csv('author_task3.csv')
+
+author_political_interest_2016 <- author_original %>%
+  select(2:15, political_interest_gpt3) %>% 
+  mutate(model_name = 'gpt_3')
+names(author_political_interest_2016) <- col_names_12_16
+
+author_discuss_politics_2016 <- author_original %>%
+  select(2:15, discuss_politics_gpt3) %>% 
+  mutate(model_name = 'gpt_3')
+names(author_discuss_politics_2016) <- col_names_12_16
+  
+
+author_church_goer_2016 <- author_original %>%
+  select(2:15, church_goer_gpt3) %>% 
+  mutate(model_name = 'gpt_3')
+names(author_church_goer_2016) <- col_names_12_16
+
+political_interest_2016 <- rbind(political_interest_2016,author_political_interest_2016)
+discuss_politics_2016 <- rbind(discuss_politics_2016,author_discuss_politics_2016)
+church_goer_2016 <- rbind(church_goer_2016,author_church_goer_2016)
+```
+
+
+remove rows with NAs
+```{r}
+for (df_name in df_names) {
+  temp <- get(df_name)
+  temp <- temp[temp$gpt_coded_response >= 0, ]
+  if (startsWith(df_name, "political_interest")) {
+    temp <- temp %>% filter(political_interest>0) }
+  else if (startsWith(df_name, "discuss_politics")) {
+    temp <- temp %>% filter(discuss_politics>0)} 
+  else if (startsWith(df_name, "church_goer")) {
+    temp <- temp %>% filter(church_goer>0)}
+  
+  assign(df_name, temp, envir = .GlobalEnv)
+}
+
+#run this to preserve only rows with actual responses that matched the authors' questionnaire
+for (df_name in df_names) {
+  temp <- get(df_name)
+  temp <- temp[rowSums(temp < 0) == 0, ]
+  temp <- temp %>% filter(education < 90, ideology < 99,pid3 <5 & pid3!=0,race<6 & race!=4,gender<3)
+  nona_name <- paste0("no_na_", df_name)
+  assign(nona_name, temp, envir = .GlobalEnv)
+}
+
+```
+
+compute agreement metrics  
+
+```{r}
+model <- c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4")
+
+metric_scores <- data.frame(
+  target_var = character(),
+  year = numeric(),
+  model = character(),
+  proportion = numeric(),
+  kappa = numeric(),
+  f1 = numeric(),
+  ICC = numeric(),
+  tetrachoric = numeric()
+)
+
+for (df_name in df_names) {
+  df <- get(df_name)
+  #df$political_interest <- factor(df$political_interest)
+  #df$discuss_politics <- factor(df$discuss_politics)
+  #df$church_goer <- factor(df$church_goer)
+
+  year <- as.numeric(sub(".*_(\\d{4})$", "\\1", df_name))
+  
+  models_to_use <- if (year == 2016) {
+    c("gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4")
+  } else {
+    c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4")
+  }
+
+  if (df_name %in% c('political_interest_2012', 'political_interest_2016', 'political_interest_2020')) {
+    for (m in models_to_use) {
+      print(paste("Checking:", df_name, "Model:", m))
+      temp <- df[df$model_name == m, ]
+      ICC_result <- tryCatch({
+        min(ICC(cbind(temp$political_interest, temp$gpt_coded_response))$results$ICC[4:6])
+      }, error = function(e) {
+        print(paste("ICC error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      ICC <- round(ICC_result, digits = 2)
+      temp$political_interest <- factor(temp$political_interest)
+      temp$gpt_coded_response <- factor(temp$gpt_coded_response, levels = levels(temp$political_interest))
+      cont_table <- table(temp$political_interest, temp$gpt_coded_response)
+      proportion <- round(sum(diag(prop.table(cont_table))), 2)
+      kappa_result <- tryCatch({
+        cohen.kappa(cbind(temp$political_interest, temp$gpt_coded_response))$kappa
+      }, error = function(e) {
+        print(paste("Kappa error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      kappa <- round(kappa_result, digits = 2)
+      conf_matrix_result <- tryCatch({
+        confusionMatrix(temp$gpt_coded_response, temp$political_interest)
+      }, error = function(e) {
+        print(paste("ConfusionMatrix error at:", df_name, "Model:", m, "Error:", e$message))
+        list(byClass = NA)
+      })
+      conf_matrix <- conf_matrix_result
+      per_class_metrics <- conf_matrix$byClass
+      class_counts <- table(temp$political_interest)
+      f1 <- tryCatch({
+        round(sum(per_class_metrics[, "F1"] * class_counts) / sum(class_counts), 2)
+      }, error = function(e) {
+        print(paste("F1 error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      tetrachoric <- NA
+      target_var <- 'political_interest'
+      metric_scores <- rbind(metric_scores, data.frame(
+        target_var = target_var,
+        year = year,
+        model = m,
+        proportion = proportion,
+        kappa = kappa,
+        tetrachoric = tetrachoric,
+        f1 = f1,
+        ICC = ICC
+      ))
+    }
+  }
+  
+  if (df_name %in% c('discuss_politics_2012', 'discuss_politics_2016', 'discuss_politics_2020')) {
+    for (m in models_to_use) {
+      print(paste("Checking:", df_name, "Model:", m))
+      temp <- df[df$model_name == m, ]
+      ICC_result <- tryCatch({
+        min(ICC(cbind(temp$discuss_politics, temp$gpt_coded_response))$results$ICC[4:6])
+      }, error = function(e) {
+        print(paste("ICC error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      ICC <- round(ICC_result, digits = 2)
+      temp$discuss_politics <- factor(temp$discuss_politics)
+      temp$gpt_coded_response <- factor(temp$gpt_coded_response, levels = levels(temp$discuss_politics))
+      temp$discuss_politics <- droplevels(temp$discuss_politics)
+      temp$gpt_coded_response <- droplevels(temp$gpt_coded_response)
+      cont_table <- table(temp$discuss_politics, temp$gpt_coded_response)
+      proportion <- round(sum(diag(prop.table(cont_table))), 2)
+      kappa_result <- tryCatch({
+        cohen.kappa(cbind(temp$discuss_politics, temp$gpt_coded_response))$kappa
+      }, error = function(e) {
+        print(paste("Kappa error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      kappa <- round(kappa_result, digits = 2)
+      conf_matrix_result <- tryCatch({
+        confusionMatrix(temp$gpt_coded_response, temp$discuss_politics)
+      }, error = function(e) {
+        print(paste("ConfusionMatrix error at:", df_name, "Model:", m, "Error:", e$message))
+        list(byClass = NA)
+      })
+      conf_matrix <- conf_matrix_result
+      per_class_metrics <- conf_matrix$byClass
+      f1 <- round(per_class_metrics["F1"], 2)
+      tetrachoric <- round(tetrachoric(cbind(temp$discuss_politics, temp$gpt_coded_response))$rho[2], digits = 2)
+      target_var <- 'discuss_politics'
+      metric_scores <- rbind(metric_scores, data.frame(
+        target_var = target_var,
+        year = year,
+        model = m,
+        proportion = proportion,
+        kappa = kappa,
+        tetrachoric = tetrachoric,
+        f1 = f1,
+        ICC = ICC
+      ))
+    }
+  }
+  
+  if (df_name %in% c('church_goer_2012', 'church_goer_2016', 'church_goer_2020')) {
+    for (m in models_to_use) {
+      print(paste("Checking:", df_name, "Model:", m))
+      temp <- df[df$model_name == m, ]
+      ICC_result <- tryCatch({
+        min(ICC(cbind(temp$church_goer, temp$gpt_coded_response))$results$ICC[4:6])
+      }, error = function(e) {
+        print(paste("ICC error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      ICC <- round(ICC_result, digits = 2)
+      temp$church_goer <- factor(temp$church_goer)
+      temp$gpt_coded_response <- factor(temp$gpt_coded_response, levels = levels(temp$church_goer))
+      cont_table <- table(temp$church_goer, temp$gpt_coded_response)
+      proportion <- round(sum(diag(prop.table(cont_table))), 2)
+      kappa_result <- tryCatch({
+        cohen.kappa(cbind(temp$church_goer, temp$gpt_coded_response))$kappa
+      }, error = function(e) {
+        print(paste("Kappa error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      kappa <- round(kappa_result, digits = 2)
+      conf_matrix_result <- tryCatch({
+        confusionMatrix(temp$gpt_coded_response, temp$church_goer)
+      }, error = function(e) {
+        print(paste("ConfusionMatrix error at:", df_name, "Model:", m, "Error:", e$message))
+        list(byClass = NA)
+      })
+      conf_matrix <- conf_matrix_result
+      per_class_metrics <- conf_matrix$byClass
+      f1 <- round(per_class_metrics["F1"], 2)
+      tetrachoric <- round(tetrachoric(cbind(temp$church_goer, temp$gpt_coded_response))$rho[2], digits = 2)
+      target_var <- 'church_goer'
+      metric_scores <- rbind(metric_scores, data.frame(
+        target_var = target_var,
+        year = year,
+        model = m,
+        proportion = proportion,
+        kappa = kappa,
+        tetrachoric = tetrachoric,
+        f1 = f1,
+        ICC = ICC
+      ))
+    }
+  }
+}
+```
+
+
+
+political interest, 2012
+```{r}
+political_interest_metric_scores_2012 <- metric_scores %>%
+  filter(target_var == 'political_interest', year == 2012) %>%
+  select(model, proportion,f1, kappa,ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+political_interest_metric_scores_2012 <- political_interest_metric_scores_2012 %>%
+  pivot_longer(cols = c(proportion, kappa,f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+political_interest_metric_scores_2012 <- political_interest_metric_scores_2012 %>%
+  add_row(
+    model = "gpt_3",
+    metric = "proportion",
+    value = NA 
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "f1",
+    value = NA
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "kappa",
+    value = NA
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "ICC",
+    value = NA
+  )
+
+political_interest_metric_scores_2012$model <- factor(political_interest_metric_scores_2012$model, levels = c('gpt_3',"gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+political_interest_metric_scores_2012$metric <- factor(political_interest_metric_scores_2012$metric, levels = c("proportion", "f1", "kappa", "ICC"))
+
+pi_2012 <- political_interest_metric_scores_2012 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 7,
+    color = "black"
+  ) +
+  annotate("text", x = 4, y = 0.45, label = "Year: 2012", hjust = 0.6, vjust = 1, size = 10, color = "black") +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  theme(
+    legend.position = c(0.85,0.8),
+    #legend.direction = "horizontal",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 20),
+    axis.text.y = element_text(size = 20),
+    axis.text.x = element_blank(),
+  ) +
+  scale_y_continuous(limits = c(-0.16, 0.45),breaks = seq(-0.15, 0.45, by = 0.15))
+
+pi_2012
+ggsave("./figures/political_interest_2012.png", plot = pi_2012, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+political interest, 2016
+```{r}
+political_interest_metric_scores_2016 <- metric_scores %>%
+  filter(target_var == 'political_interest', year == 2016) %>%
+  select(model, proportion,f1,kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+political_interest_metric_scores_2016 <- political_interest_metric_scores_2016 %>%
+  pivot_longer(cols = c(proportion, kappa, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+political_interest_metric_scores_2016$model <- factor(political_interest_metric_scores_2016$model, levels = c("gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+political_interest_metric_scores_2016$metric <- factor(political_interest_metric_scores_2016$metric, levels = c("proportion", "f1", "kappa", "ICC"))
+
+pi_2016 <- political_interest_metric_scores_2016 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.45,
+    size = 7,
+    color = "black"
+  ) +
+  annotate("text", x = 4, y = 0.45, label = "Year: 2016", hjust = 0.6, vjust = 1, size = 10, color = "black") +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 20),
+    legend.text = element_text(size = 20)
+  ) +
+  scale_y_continuous(limits = c(-0.12, 0.45),breaks = seq(-0.1, 0.45, by = 0.15))
+
+pi_2016
+ggsave("./figures/political_interest_2016.png", plot = pi_2016, width = 15, height = 7, units = "in", dpi = 300)
+```
+political interest, 2020
+```{r}
+political_interest_metric_scores_2020 <- metric_scores %>%
+  filter(target_var == 'political_interest', year == 2020) %>%
+  select(model, proportion,f1, kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+political_interest_metric_scores_2020 <- political_interest_metric_scores_2020 %>%
+  pivot_longer(cols = c(proportion, kappa, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+political_interest_metric_scores_2020$model <- factor(political_interest_metric_scores_2020$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+political_interest_metric_scores_2020$metric <- factor(political_interest_metric_scores_2020$metric, levels = c("proportion", "f1", "kappa", "ICC"))
+
+pi_2020 <- political_interest_metric_scores_2020 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+   annotate("text", x = 4, y = 0.45, label = "Year: 2020", hjust = 0.6, vjust = 1, size = 10, color = "black") +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 7,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 20)) +
+  scale_y_continuous(limits = c(-0.41, 0.45), breaks = seq(-0.4, 0.45, by = 0.15))
+pi_2020
+ggsave("./figures/political_interest_2020.png", plot = pi_2020, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+discuss politics, 2012
+```{r}
+discuss_politics_metric_scores_2012 <- metric_scores %>%
+  filter(target_var == 'discuss_politics', year == 2012) %>%
+  select(model, proportion,f1,tetrachoric, kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+discuss_politics_metric_scores_2012 <- discuss_politics_metric_scores_2012 %>%
+  pivot_longer(cols = c(proportion, kappa,tetrachoric, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+discuss_politics_metric_scores_2012 <- discuss_politics_metric_scores_2012 %>%
+  add_row(
+    model = "gpt_3",
+    metric = "proportion",
+    value = NA 
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "f1",
+    value = NA
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "kappa",
+    value = NA
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "ICC",
+    value = NA
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "tetrachoric",
+    value = NA
+  )
+
+discuss_politics_metric_scores_2012$model <- factor(discuss_politics_metric_scores_2012$model, levels = c('gpt_3',"gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+discuss_politics_metric_scores_2012$metric <- factor(discuss_politics_metric_scores_2012$metric, levels = c("proportion", "f1",'kappa', "ICC",'tetrachoric'))
+
+dp_2012 <- discuss_politics_metric_scores_2012 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.9),
+    vjust = -0.5,
+    size = 7,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  annotate("text", x = 4, y = 0.45, label = "Year: 2012", hjust = -0.55, vjust =-8, size = 10, color = "black") +
+  theme_light() +
+  theme(
+    legend.position = c(0.85,0.8),
+    #legend.direction = "horizontal",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 20),
+    axis.text.y = element_text(size = 20),
+    axis.text.x = element_blank(),
+  ) +
+  scale_y_continuous(limits = c(-0.2, 0.9),breaks = seq(-0.2, 0.95, by = 0.15))
+
+dp_2012
+ggsave("./figures/discuss_politics_2012.png", plot = dp_2012, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+discuss politics, 2016
+```{r}
+discuss_politics_metric_scores_2016 <- metric_scores %>%
+  filter(target_var == 'discuss_politics', year == 2016) %>%
+  select(model, proportion,f1, kappa,tetrachoric, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+discuss_politics_metric_scores_2016 <- discuss_politics_metric_scores_2016 %>%
+  pivot_longer(cols = c(proportion, kappa,tetrachoric, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+discuss_politics_metric_scores_2016$model <- factor(discuss_politics_metric_scores_2016$model, levels = c("gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+discuss_politics_metric_scores_2016$metric <- factor(discuss_politics_metric_scores_2016$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+dp_2016 <- discuss_politics_metric_scores_2016 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 1),
+    vjust = -0.5,
+    size = 7,
+    color = "black"
+  ) +
+  annotate("text", x = 4, y = 0.45, label = "Year: 2016", hjust = -0.55, vjust = -9.9, size = 10, color = "black") +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 20),
+    legend.text = element_text(size = 20)
+  ) +
+  scale_y_continuous(limits = c(0, 0.95), breaks = seq(0, 0.95, by = 0.15))
+
+dp_2016
+ggsave("./figures/discuss_politics_2016.png", plot = dp_2016, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+discuss politics, 2020
+```{r}
+discuss_politics_metric_scores_2020 <- metric_scores %>%
+  filter(target_var == 'discuss_politics', year == 2020) %>%
+  select(model, proportion,f1,tetrachoric, kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+discuss_politics_metric_scores_2020 <- discuss_politics_metric_scores_2020 %>%
+  pivot_longer(cols = c(proportion, kappa,tetrachoric, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+discuss_politics_metric_scores_2020$model <- factor(discuss_politics_metric_scores_2020$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+discuss_politics_metric_scores_2020$metric <- factor(discuss_politics_metric_scores_2020$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+dp_2020 <- discuss_politics_metric_scores_2020 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 7,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  annotate("text", x = 4, y = 0.45, label = "Year: 2020", hjust = -0.55, vjust = -9.9, size = 10, color = "black") +
+  theme_light() +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 20)) +
+  scale_y_continuous(limits = c(0, 0.96), breaks = seq(-0.4, 0.95, by = 0.15))
+dp_2020
+ggsave("./figures/discuss_politics_2020.png", plot = dp_2020, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+church goer, 2012
+```{r}
+church_goer_metric_scores_2012 <- metric_scores %>%
+  filter(target_var == 'church_goer', year == 2012) %>%
+  select(model, proportion,f1, kappa, tetrachoric,ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+church_goer_metric_scores_2012 <- church_goer_metric_scores_2012 %>%
+  pivot_longer(cols = c(proportion, kappa, tetrachoric,f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+church_goer_metric_scores_2012 <- church_goer_metric_scores_2012 %>%
+  add_row(
+    model = "gpt_3",
+    metric = "proportion",
+    value = NA 
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "f1",
+    value = NA
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "kappa",
+    value = NA
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "ICC",
+    value = NA
+  ) %>%
+  add_row(
+    model = "gpt_3",
+    metric = "tetrachoric",
+    value = NA
+  )
+
+church_goer_metric_scores_2012$model <- factor(church_goer_metric_scores_2012$model, levels = c('gpt_3',"gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+church_goer_metric_scores_2012$metric <- factor(church_goer_metric_scores_2012$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+cg_2012 <- church_goer_metric_scores_2012 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.8),
+    vjust = -0.5,
+    size = 7,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  annotate("text", x = 4, y = 0.45, label = "Year: 2012", hjust = -0.55, vjust = -5.9, size = 10, color = "black") +
+  theme(
+    legend.position = c(0.85,0.8),
+    #legend.direction = "horizontal",
+    legend.title = element_blank(),
+    legend.text = element_text(size = 20),
+    axis.text.y = element_text(size = 20),
+    axis.text.x = element_blank(),
+  ) +
+  scale_y_continuous(limits = c(-0.41, 0.8),breaks = seq(-0.4, 0.8, by = 0.15))
+
+cg_2012
+ggsave("./figures/church_goer_2012.png", plot = cg_2012, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+church goer, 2016
+```{r}
+church_goer_metric_scores_2016 <- metric_scores %>%
+  filter(target_var == 'church_goer', year == 2016) %>%
+  select(model, proportion,f1, kappa, tetrachoric,ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+church_goer_metric_scores_2016 <- church_goer_metric_scores_2016 %>%
+  pivot_longer(cols = c(proportion, kappa, tetrachoric,f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+church_goer_metric_scores_2016$model <- factor(church_goer_metric_scores_2016$model, levels = c("gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+church_goer_metric_scores_2016$metric <- factor(church_goer_metric_scores_2016$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+cg_2016 <- church_goer_metric_scores_2016 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 7,
+    color = "black"
+  ) +
+  annotate("text", x = 4, y = 0.45, label = "Year: 2016", hjust = -0.4, vjust = -4.7, size = 10, color = "black") +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    axis.text.x = element_blank(),
+    axis.text.y = element_text(size = 20),
+    legend.text = element_text(size = 20)
+  ) +
+  scale_y_continuous(limits = c(-0.45, 0.75),breaks = seq(-0.45,0.8,by=0.2))
+
+cg_2016
+ggsave("./figures/church_goer_2016.png", plot = cg_2016, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+church goer, 2020
+```{r}
+church_goer_metric_scores_2020 <- metric_scores %>%
+  filter(target_var == 'church_goer', year == 2020) %>%
+  select(model, proportion,f1,tetrachoric, kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+church_goer_metric_scores_2020 <- church_goer_metric_scores_2020 %>%
+  pivot_longer(cols = c(proportion, kappa,tetrachoric, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+church_goer_metric_scores_2020$model <- factor(church_goer_metric_scores_2020$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+church_goer_metric_scores_2020$metric <- factor(church_goer_metric_scores_2020$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+cg_2020 <- church_goer_metric_scores_2020 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 7,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  annotate("text", x = 4, y = 0.45, label = "Year: 2020", hjust = -0.4, vjust = -4.9, size = 10, color = "black") +
+  theme_light() +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme(
+    legend.position = "none",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 30),
+    axis.text.y = element_text(size = 20)) +
+  scale_y_continuous(limits = c(0, 0.65),breaks = seq(0, 0.65, by = 0.15))
+cg_2020
+ggsave("./figures/church_goer_2020.png", plot = cg_2020, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+compute agreement metrics only for rows with full responses
+```{r}
+df_names_no_na <- c(
+  "no_na_political_interest_2012", "no_na_political_interest_2016", "no_na_political_interest_2020",
+  "no_na_discuss_politics_2012", "no_na_discuss_politics_2016", "no_na_discuss_politics_2020",
+  "no_na_church_goer_2012", "no_na_church_goer_2016", "no_na_church_goer_2020"
+)
+
+model <- c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4")
+
+metric_scores_no_na <- data.frame(
+  target_var = character(),
+  year = numeric(),
+  model = character(),
+  proportion = numeric(),
+  kappa = numeric(),
+  f1 = numeric(),
+  tetrachoric = numeric(),
+  ICC = numeric()
+)
+
+for (df_name in df_names_no_na) {
+  df <- get(df_name)
+  df$political_interest <- factor(df$political_interest)
+  df$discuss_politics <- factor(df$discuss_politics)
+  df$church_goer <- factor(df$church_goer)
+
+  year <- as.numeric(sub(".*_(\\d{4})$", "\\1", df_name))
+  
+  models_to_use <- if (year == 2016) {
+    c("gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4")
+  } else {
+    c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4")
+  }
+
+  if (df_name %in% c('no_na_political_interest_2012', 'no_na_political_interest_2016', 'no_na_political_interest_2020')) {
+    for (m in models_to_use) {
+      print(paste("Checking:", df_name, "Model:", m)) 
+      temp <- df[df$model_name == m, ]
+      temp$political_interest <- factor(temp$political_interest)
+      temp$gpt_coded_response <- factor(temp$gpt_coded_response, levels = levels(temp$political_interest))
+      cont_table <- table(temp$political_interest, temp$gpt_coded_response)
+      proportion <- round(sum(diag(prop.table(cont_table))), 2)
+      
+      ICC_result <- tryCatch({
+        max(ICC(cbind(temp$political_interest, temp$gpt_coded_response))$results$ICC[4:6])
+      }, error = function(e) {
+        print(paste("ICC error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      ICC <- round(ICC_result, digits = 2)
+      
+      kappa_result <- tryCatch({
+        cohen.kappa(cbind(temp$political_interest, temp$gpt_coded_response))$kappa
+      }, error = function(e) {
+        print(paste("Kappa error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      kappa <- round(kappa_result, digits = 2)
+      
+      conf_matrix_result <- tryCatch({
+        confusionMatrix(temp$gpt_coded_response, temp$political_interest)
+      }, error = function(e) {
+        print(paste("ConfusionMatrix error at:", df_name, "Model:", m, "Error:", e$message))
+        list(byClass = NA)
+      })
+      conf_matrix <- conf_matrix_result
+      per_class_metrics <- conf_matrix$byClass
+      class_counts <- table(temp$political_interest)
+      f1 <- tryCatch({
+        round(sum(per_class_metrics[, "F1"] * class_counts) / sum(class_counts), 2)
+      }, error = function(e) {
+        print(paste("F1 error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      tetrachoric <- NA
+      target_var <- 'political_interest'
+      metric_scores_no_na <- rbind(metric_scores_no_na, data.frame(
+        target_var = target_var,
+        year = year,
+        model = m,
+        proportion = proportion,
+        kappa = kappa,
+        tetrachoric = tetrachoric,
+        f1 = f1,
+        ICC = ICC
+      ))
+    }
+  }
+  
+  if (df_name %in% c('no_na_discuss_politics_2012', 'no_na_discuss_politics_2016', 'no_na_discuss_politics_2020')) {
+    for (m in models_to_use) {
+      print(paste("Checking:", df_name, "Model:", m))
+      temp <- df[df$model_name == m, ]
+      temp$discuss_politics <- factor(temp$discuss_politics)
+      temp$gpt_coded_response <- factor(temp$gpt_coded_response, levels = levels(temp$discuss_politics))
+      cont_table <- table(temp$discuss_politics, temp$gpt_coded_response)
+      proportion <- round(sum(diag(prop.table(cont_table))), 2)
+      ICC <- tryCatch({
+        round(max(ICC(cbind(temp$discuss_politics, temp$gpt_coded_response))$results$ICC[4:6]), digits = 2)
+      }, error = function(e) {
+        print(paste("ICC error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      kappa <- tryCatch({
+        round(cohen.kappa(cbind(temp$discuss_politics, temp$gpt_coded_response))$kappa, digits = 2)
+      }, error = function(e) {
+        print(paste("Kappa error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      conf_matrix <- tryCatch({
+        confusionMatrix(temp$gpt_coded_response, temp$discuss_politics)
+      }, error = function(e) {
+        print(paste("ConfusionMatrix error at:", df_name, "Model:", m, "Error:", e$message))
+        list(byClass = NA)
+      })
+      per_class_metrics <- conf_matrix$byClass
+      f1 <- round(per_class_metrics["F1"], 2)
+      tetrachoric <- round(tetrachoric(cbind(temp$discuss_politics, temp$gpt_coded_response))$rho[2], digits = 2)
+      target_var <- 'discuss_politics'
+      metric_scores_no_na <- rbind(metric_scores_no_na, data.frame(
+        target_var = target_var,
+        year = year,
+        model = m,
+        proportion = proportion,
+        kappa = kappa,
+        f1 = f1,
+        tetrachoric = tetrachoric,
+        ICC = ICC
+      ))
+    }
+  }
+  
+  if (df_name %in% c('no_na_church_goer_2012', 'no_na_church_goer_2016', 'no_na_church_goer_2020')) {
+    for (m in models_to_use) {
+      print(paste("Checking:", df_name, "Model:", m))
+      temp <- df[df$model_name == m, ]
+      temp$church_goer <- factor(temp$church_goer)
+      temp$gpt_coded_response <- factor(temp$gpt_coded_response, levels = levels(temp$church_goer))
+      cont_table <- table(temp$church_goer, temp$gpt_coded_response)
+      proportion <- round(sum(diag(prop.table(cont_table))), 2)
+      ICC <- tryCatch({
+        round(max(ICC(cbind(temp$church_goer, temp$gpt_coded_response))$results$ICC[4:6]), digits = 2)
+      }, error = function(e) {
+        print(paste("ICC error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      kappa <- tryCatch({
+        round(cohen.kappa(cbind(temp$church_goer, temp$gpt_coded_response))$kappa, digits = 2)
+      }, error = function(e) {
+        print(paste("Kappa error at:", df_name, "Model:", m, "Error:", e$message))
+        NA
+      })
+      conf_matrix <- tryCatch({
+        confusionMatrix(temp$gpt_coded_response, temp$church_goer)
+      }, error = function(e) {
+        print(paste("ConfusionMatrix error at:", df_name, "Model:", m, "Error:", e$message))
+        list(byClass = NA)
+      })
+      per_class_metrics <- conf_matrix$byClass
+      f1 <- round(per_class_metrics["F1"], 2)
+      tetrachoric <- round(tetrachoric(cbind(temp$church_goer, temp$gpt_coded_response))$rho[2], digits = 2)
+      target_var <- 'church_goer'
+      metric_scores_no_na <- rbind(metric_scores_no_na, data.frame(
+        target_var = target_var,
+        year = year,
+        model = m,
+        proportion = proportion,
+        kappa = kappa,
+        f1 = f1,
+        tetrachoric = tetrachoric,
+        ICC = ICC
+      ))
+    }
+  }
+}
+```
+
+political interest, 2012
+```{r}
+political_interest_metric_scores_2012 <- metric_scores_no_na %>%
+  filter(target_var == 'political_interest', year == 2012) %>%
+  select(model, proportion,f1, kappa,ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+political_interest_metric_scores_2012 <- political_interest_metric_scores_2012 %>%
+  pivot_longer(cols = c(proportion, kappa,f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+political_interest_metric_scores_2012$model <- factor(political_interest_metric_scores_2012$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+political_interest_metric_scores_2012$metric <- factor(political_interest_metric_scores_2012$metric, levels = c("proportion", "f1", "kappa", "ICC"))
+
+pi_nona_2012 <- political_interest_metric_scores_2012 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(0, 0.5))
+pi_nona_2012
+ggsave("./figures/political_interests_nona_2012.png", plot = pi_nona_2012, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+political interest, 2016
+```{r}
+political_interest_metric_scores_2016 <- metric_scores_no_na %>%
+  filter(target_var == 'political_interest', year == 2016) %>%
+  select(model, proportion,f1,kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+political_interest_metric_scores_2016 <- political_interest_metric_scores_2016 %>%
+  pivot_longer(cols = c(proportion, kappa, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+political_interest_metric_scores_2016$model <- factor(political_interest_metric_scores_2016$model, levels = c("gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+political_interest_metric_scores_2016$metric <- factor(political_interest_metric_scores_2016$metric, levels = c("proportion", "f1", "kappa", "ICC"))
+
+pi_nona_2016 <- political_interest_metric_scores_2016 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(-0.15, 0.5))
+pi_nona_2016
+ggsave("./figures/political_interests_nona_2016.png", plot = pi_nona_2016, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+political interest, 2020
+```{r}
+political_interest_metric_scores_2020 <- metric_scores_no_na %>%
+  filter(target_var == 'political_interest', year == 2020) %>%
+  select(model, proportion,f1, kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+political_interest_metric_scores_2020 <- political_interest_metric_scores_2020 %>%
+  pivot_longer(cols = c(proportion, kappa, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+political_interest_metric_scores_2020$model <- factor(political_interest_metric_scores_2020$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+political_interest_metric_scores_2020$metric <- factor(political_interest_metric_scores_2020$metric, levels = c("proportion", "f1", "kappa", "ICC"))
+
+pi_nona_2020 <- political_interest_metric_scores_2020 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(0, 0.5))
+pi_nona_2020
+ggsave("./figures/political_interests_nona_2020.png", plot = pi_nona_2020, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+discuss politics, 2012
+```{r}
+discuss_politics_metric_scores_2012 <- metric_scores_no_na %>%
+  filter(target_var == 'discuss_politics', year == 2012) %>%
+  select(model, proportion,f1,tetrachoric, kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+discuss_politics_metric_scores_2012 <- discuss_politics_metric_scores_2012 %>%
+  pivot_longer(cols = c(proportion, kappa,tetrachoric, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+discuss_politics_metric_scores_2012$model <- factor(discuss_politics_metric_scores_2012$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+discuss_politics_metric_scores_2012$metric <- factor(discuss_politics_metric_scores_2012$metric, levels = c("proportion", "f1",'kappa', "ICC",'tetrachoric'))
+
+dp_nona_2012 <- discuss_politics_metric_scores_2012 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(-0.2, 0.9))
+
+dp_nona_2012
+ggsave("./figures/discuss_politics_nona_2012.png", plot = dp_nona_2012, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+discuss politics, 2016
+```{r}
+discuss_politics_metric_scores_2016 <- metric_scores_no_na %>%
+  filter(target_var == 'discuss_politics', year == 2016) %>%
+  select(model, proportion,f1, kappa,tetrachoric, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+discuss_politics_metric_scores_2016 <- discuss_politics_metric_scores_2016 %>%
+  pivot_longer(cols = c(proportion, kappa,tetrachoric, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+discuss_politics_metric_scores_2016$model <- factor(discuss_politics_metric_scores_2016$model, levels = c("gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+discuss_politics_metric_scores_2016$metric <- factor(discuss_politics_metric_scores_2016$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+dp_nona_2016 <- discuss_politics_metric_scores_2016 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(0, 0.95))
+
+dp_nona_2016
+ggsave("./figures/discuss_politics_nona_2016.png", plot = dp_nona_2016, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+discuss politics, 2020
+```{r}
+discuss_politics_metric_scores_2020 <- metric_scores_no_na %>%
+  filter(target_var == 'discuss_politics', year == 2020) %>%
+  select(model, proportion,f1,tetrachoric, kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+discuss_politics_metric_scores_2020 <- discuss_politics_metric_scores_2020 %>%
+  pivot_longer(cols = c(proportion, kappa,tetrachoric, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+discuss_politics_metric_scores_2020$model <- factor(discuss_politics_metric_scores_2020$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+discuss_politics_metric_scores_2020$metric <- factor(discuss_politics_metric_scores_2020$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+dp_nona_2020 <- discuss_politics_metric_scores_2020 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(0, 1))
+dp_nona_2020
+ggsave("./figures/discuss_politics_nona_2020.png", plot = dp_nona_2020, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+church goer, 2012
+```{r}
+church_goer_metric_scores_2012 <- metric_scores_no_na %>%
+  filter(target_var == 'church_goer', year == 2012) %>%
+  select(model, proportion,f1, kappa, tetrachoric,ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+church_goer_metric_scores_2012 <- church_goer_metric_scores_2012 %>%
+  pivot_longer(cols = c(proportion, kappa, tetrachoric,f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+church_goer_metric_scores_2012$model <- factor(church_goer_metric_scores_2012$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+church_goer_metric_scores_2012$metric <- factor(church_goer_metric_scores_2012$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+cg_nona_2012 <- church_goer_metric_scores_2012 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(0, 0.8),breaks = seq(0, 0.8, by = 0.2))
+
+cg_nona_2012
+ggsave("./figures/church_goer_nona_2012.png", plot = cg_nona_2012, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+church goer, 2016
+```{r}
+church_goer_metric_scores_2016 <- metric_scores_no_na %>%
+  filter(target_var == 'church_goer', year == 2016) %>%
+  select(model, proportion,f1, kappa, tetrachoric,ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+church_goer_metric_scores_2016 <- church_goer_metric_scores_2016 %>%
+  pivot_longer(cols = c(proportion, kappa, tetrachoric,f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+church_goer_metric_scores_2016$model <- factor(church_goer_metric_scores_2016$model, levels = c("gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+church_goer_metric_scores_2016$metric <- factor(church_goer_metric_scores_2016$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+cg_nona_2016 <- church_goer_metric_scores_2016 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(0, 0.8),breaks = seq(0,0.8,by=0.2))
+cg_nona_2016
+ggsave("./figures/church_goer_nona_2016.png", plot = cg_nona_2016, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+church goer, 2020
+```{r}
+church_goer_metric_scores_2020 <- metric_scores_no_na %>%
+  filter(target_var == 'church_goer', year == 2020) %>%
+  select(model, proportion,f1,tetrachoric, kappa, ICC) %>%
+  mutate(across(where(is.numeric), ~ replace(., is.na(.), NA)))
+
+church_goer_metric_scores_2020 <- church_goer_metric_scores_2020 %>%
+  pivot_longer(cols = c(proportion, kappa,tetrachoric, f1,ICC),
+               names_to = "metric",
+               values_to = "value") 
+
+church_goer_metric_scores_2020$model <- factor(church_goer_metric_scores_2020$model, levels = c("gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+church_goer_metric_scores_2020$metric <- factor(church_goer_metric_scores_2020$metric, levels = c("proportion", "f1", "kappa", "ICC",'tetrachoric'))
+
+cg_nona_2020 <- church_goer_metric_scores_2020 %>%
+  ggplot(aes(x = metric, y = value, fill = model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.7), width = 0.7) +
+  geom_text(
+    aes(label = sprintf("%.2f", value)),
+    position = position_dodge(width = 0.7),
+    vjust = -0.5,
+    size = 3,
+    color = "black"
+  ) +
+  labs(
+    x = "",
+    y = ""
+  ) +
+  theme_light() +
+  scale_fill_manual(
+    values = c(
+      "gpt_3_5_turbo" = "#7CAE00", 
+      "gpt_4o_mini" = "#00BFC4",    
+      "gpt_4" = "#C77CFF"          
+    )
+  ) +
+  theme(
+    legend.position = "bottom",
+    legend.title = element_blank(),
+    axis.text.x = element_text(size = 10),
+    axis.text.y = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  ) +
+  scale_y_continuous(limits = c(0, 0.7),breaks = seq(0, 0.7, by = 0.15))
+cg_nona_2020
+ggsave("./figures/church_goer_nona_2020.png", plot = cg_nona_2020, width = 15, height = 7, units = "in", dpi = 300)
+```
+
+Graph confusion matrix for each target variable for a selected year
+```{r}
+#political interest
+political_interest_2016_confusion <- political_interest_2016 %>% filter(model_name == 'gpt_4')
+political_interest_2016_confusion$political_interest <- factor(political_interest_2016_confusion$political_interest, levels=c(1,2,3,4))
+political_interest_2016_confusion$gpt_coded_response <- factor(political_interest_2016_confusion$gpt_coded_response, levels=c(1,2,3,4))
+
+political_interest_2016_conf_matrix <- confusionMatrix(political_interest_2016_confusion$gpt_coded_response, political_interest_2016_confusion$political_interest)
+
+political_interest_conf_table <- as.data.frame(political_interest_2016_conf_matrix$table)
+colnames(political_interest_conf_table) <- c("GPT", "ANES", "Count")
+
+political_interest_conf_table <- political_interest_conf_table %>%
+  mutate(
+    Percentage = round((Count /  sum(political_interest_conf_table$Count)) * 100, 2),
+    Label = paste0(Count, "\n(", Percentage, "%)")
+  )
+```
+
+```{r}
+heatmap_political_interest <- ggplot(political_interest_conf_table, aes(x = ANES, y = GPT, fill = Count)) +
+  geom_tile(color = "gray", linewidth = 0.5) +
+  geom_text(aes(label = Label), color = "black", size = 7, fontface = "bold") +
+  scale_fill_gradient(low = "white", high = "#1f77b4", name = "Count") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "",
+    x = "ANES",
+    y = "GPT - 4") +
+  theme(
+    legend.position = "none", 
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 20),
+    plot.caption = element_text(size = 20, hjust = 0),
+  ) +
+  scale_x_discrete(labels = c("Very", "Somewhat", "Slightly", "Not at all")) +
+  scale_y_discrete(labels = c("Very", "Somewhat", "Slightly", "Not at all")) +
+  coord_fixed()
+heatmap_political_interest
+ggsave("./figures/heatmap_political_interest.png", plot = heatmap_political_interest, width = 7, height = 7, units = "in", dpi = 300)
+```
+
+
+```{r}
+#discuss politics
+discuss_politics_2016_confusion <- discuss_politics_2016 %>% filter(model_name == 'gpt_4')
+discuss_politics_2016_confusion$discuss_politics <- factor(discuss_politics_2016_confusion$discuss_politics, levels=c(1,2))
+discuss_politics_2016_confusion$gpt_coded_response <- factor(discuss_politics_2016_confusion$gpt_coded_response, levels=c(1,2))
+
+discuss_politics_2016_conf_matrix <- confusionMatrix(discuss_politics_2016_confusion$gpt_coded_response, discuss_politics_2016_confusion$discuss_politics)
+
+discuss_politics_conf_table <- as.data.frame(discuss_politics_2016_conf_matrix$table)
+colnames(discuss_politics_conf_table) <- c("GPT", "ANES", "Count")
+
+discuss_politics_conf_table <- discuss_politics_conf_table %>%
+  mutate(
+    Percentage = round((Count /  sum(discuss_politics_conf_table$Count)) * 100, 2),
+    Label = paste0(Count, "\n(", Percentage, "%)")
+  )
+```
+
+```{r}
+heatmap_discuss_politics <- ggplot(discuss_politics_conf_table, aes(x = ANES, y = GPT, fill = Count)) +
+  geom_tile(color = "gray", linewidth = 0.5) +
+  geom_text(aes(label = Label), color = "black", size = 7, fontface = "bold") +
+  scale_fill_gradient(low = "white", high = "#1f77b4", name = "Count") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "",
+    x = "ANES",
+    y = "GPT - 4") +
+  theme(
+    legend.position = "none", 
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 20),
+    plot.caption = element_text(size = 20, hjust = 0),
+  ) +
+  scale_x_discrete(labels = c("Yes", "No")) +
+  scale_y_discrete(labels = c("Yes", "No")) +
+  coord_fixed()
+heatmap_discuss_politics
+ggsave("./figures/heatmap_discuss_politics.png", plot = heatmap_discuss_politics, width = 7, height = 7, units = "in", dpi = 300)
+```
+
+```{r}
+#church goer
+church_goer_2020_confusion <- church_goer_2020 %>% filter(model_name == 'gpt_4o_mini')
+church_goer_2020_confusion$church_goer <- factor(church_goer_2020_confusion$church_goer, levels=c(1,2))
+church_goer_2020_confusion$gpt_coded_response <- factor(church_goer_2020_confusion$gpt_coded_response, levels=c(1,2))
+
+church_goer_2020_conf_matrix <- confusionMatrix(church_goer_2020_confusion$gpt_coded_response, church_goer_2020_confusion$church_goer)
+
+church_goer_conf_table <- as.data.frame(church_goer_2020_conf_matrix$table)
+colnames(church_goer_conf_table) <- c("GPT", "ANES", "Count")
+
+church_goer_conf_table <- church_goer_conf_table %>%
+  mutate(
+    Percentage = round((Count /  sum(church_goer_conf_table$Count)) * 100, 2),
+    Label = paste0(Count, "\n(", Percentage, "%)")
+  )
+```
+
+```{r}
+heatmap_church_goer <- ggplot(church_goer_conf_table, aes(x = ANES, y = GPT, fill = Count)) +
+  geom_tile(color = "gray", linewidth = 0.5) +
+  geom_text(aes(label = Label), color = "black", size = 7, fontface = "bold") +
+  scale_fill_gradient(low = "white", high = "#1f77b4", name = "Count") +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "",
+    x = "ANES",
+    y = "GPT- 4o -mini") +
+  theme(
+    legend.position = "none", 
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 20),
+    plot.caption = element_text(size = 20, hjust = 0),
+  ) +
+  scale_x_discrete(labels = c("Yes", "No")) +
+  scale_y_discrete(labels = c("Yes", "No")) +
+  coord_fixed()
+heatmap_church_goer
+ggsave("./figures/heatmap_church_goer.png", plot = heatmap_church_goer, width = 7, height = 7, units = "in", dpi = 300)
+
+```
+
+We now replicate the authors' Cramer's V test for 2016. To ensure that we use the same observations as the authors, we first run the following portion of the authors' code and match on ids: 
+
+```{r}
+author_original <- mutate(author_original, race_anes = if_else(V161310x == 1, "white",
+                                        if_else(V161310x == 2, "black",
+                                                if_else(V161310x == 3, "asian",
+                                                        if_else(V161310x == 5, "hispanic", NA_character_)))),
+                 discuss.politics_anes = if_else(V162174 == 1, "yes discuss politics",
+                                            if_else(V162174 == 2, "never discuss politics", NA_character_)),
+                 ideology_anes = if_else(V161126 == 1, "extremely liberal", 
+                                    if_else(V161126 == 2, "liberal",
+                                            if_else(V161126 == 3, "slightly liberal",
+                                                    if_else(V161126 == 4, "moderate",
+                                                            if_else(V161126 == 5, "slightly conservative",
+                                                                    if_else(V161126 == 6, "conservative",
+                                                                            if_else(V161126 == 7, "extremely conservative", NA_character_))))))),
+                 pid7_anes = if_else(V161158x > 0, V161158x, NA_integer_),
+                 church.goer_anes = if_else(V161244 > 0, V161244, NA_integer_),
+                 age_anes = if_else(V161267 > 0, V161267, NA_integer_),
+                 education_anes = if_else(V161270 >0 & V161270 <= 9, "High School or Less", 
+                                     if_else(V161270 >= 10 & V161270 <= 12, "Some College / AA", 
+                                             if_else(V161270 == 13, "Bachelor's",
+                                                     if_else(V161270 >=14 & V161270 <= 16, "Graduate Degree", NA_character_)))),
+                 gender_anes = if_else(V161342 == 1 | V161342 == 2, V161342, NA_integer_),
+                 voted.2016_anes = if_else(V162031x == 0, "no", if_else(V162031x == 1, "yes", NA_character_)),
+                 votechoice.2016_anes = if_else(V162062x == 1, "Hillary Clinton", if_else(V162062x == 2, "Donald Trump", if_else(V162062x == 3 | V162062x == 4 | V162062x == 5, "someone else", NA_character_))),
+                 political.interest_anes = if_else(V162256 > 0, V162256, NA_integer_),
+                 patriotism_anes = if_else(V162125x > 0, V162125x, NA_integer_), 
+                 vote.2016_anes = if_else(voted.2016_anes == "no", "Did Not Vote", votechoice.2016_anes))
+
+#Clean the GPT-3 responses to match the ANES 
+author_original <- mutate(author_original, race_gpt3 = if_else(race_gpt3 == -1, NA_integer_, race_gpt3),
+                         age_gpt3 = if_else(age_gpt3 == -1, NA_integer_, age_gpt3),
+                         church.goer_gpt3 = if_else(church_goer_gpt3 == -1, NA_integer_, church_goer_gpt3),
+                         discuss.politics_gpt3 = if_else(discuss_politics_gpt3 == -1, NA_integer_, discuss_politics_gpt3),
+                         education_gpt3 = if_else(education_gpt3 == -1, NA_integer_, education_gpt3),
+                         gender_gpt3 = if_else(gender_gpt3 == -1, NA_integer_, gender_gpt3),
+                         ideology_gpt3 = if_else(ideology_gpt3 == -1, NA_integer_, ideology_gpt3),
+                         patriotism_gpt3 = if_else(patriotism_gpt3 == -1, NA_integer_, patriotism_gpt3),
+                         pid7_gpt3 = if_else(pid7_gpt3 == -1, NA_integer_, pid7_gpt3),
+                         political.interest_gpt3 = if_else(political_interest_gpt3 == -1, NA_integer_, political_interest_gpt3),
+                         votechoice.2016_gpt3 = if_else(votechoice_2016_gpt3 == -1, NA_integer_, votechoice_2016_gpt3),
+                         voted.2016_gpt3 = if_else(voted_2016_gpt3 == -1, NA_integer_, voted_2016_gpt3),
+                         vote.2016_gpt3 = if_else(voted_2016_gpt3 == 0, "Did Not Vote", as.character(votechoice.2016_gpt3)))
+
+author_original <- select(author_original, V160001_orig,age_gpt3, age_anes, church.goer_gpt3, church.goer_anes, discuss.politics_gpt3, discuss.politics_anes, race_gpt3, race_anes, education_gpt3, education_anes, gender_gpt3, gender_anes, ideology_gpt3, ideology_anes, patriotism_gpt3, patriotism_anes, pid7_gpt3, pid7_anes, political.interest_gpt3, political.interest_anes, vote.2016_gpt3, vote.2016_anes)
+author_original <- author_original[complete.cases(author_original), ]
+
+cramer_no_na_political_interest_2016 <- political_interest_2016[political_interest_2016$id %in% author_original$V160001_orig, ]
+cramer_no_na_discuss_politics_2016 <- discuss_politics_2016[discuss_politics_2016$id %in% author_original$V160001_orig, ]
+cramer_no_na_church_goer_2016 <- church_goer_2016[church_goer_2016$id %in% author_original$V160001_orig, ]
+```
+
+Compute Cramer's V for target variables in 2016 and plot each
+```{r}
+library(DescTools)
+split_political_interest_2016 <- split(cramer_no_na_political_interest_2016, cramer_no_na_political_interest_2016$model_name)
+
+political_interest_cramer <- lapply(split_political_interest_2016, function(df) {
+  df <- select(df, -model_name, -voted, -id, -political_interest)
+  target_var <- df$gpt_coded_response
+  other_vars <- select(df, -gpt_coded_response)
+  result <- map_dbl(other_vars, ~ CramerV(target_var, .x))
+  tibble(variable = names(other_vars), cramers_v = result)
+})
+
+political_interest_cramer_anes <- cramer_no_na_political_interest_2016 %>% 
+  filter(model_name == 'gpt_3') %>% 
+  select(-model_name, -voted, -id, -gpt_coded_response)
+
+target_var <- political_interest_cramer_anes$political_interest
+other_vars <- political_interest_cramer_anes %>% select(-political_interest)
+result <- map_dbl(other_vars, ~ CramerV(target_var, .x))
+ 
+anes_political_interest <- tibble(
+  variable = names(other_vars),
+  cramers_v = result
+)
+
+political_interest_cramer$anes <- bind_rows(political_interest_cramer$anes, anes_political_interest)
+political_interest_cramer_df <- bind_rows(political_interest_cramer, .id = "model_name")
+```
+
+
+```{r}
+political_interest_line_data <- political_interest_cramer_df %>%
+  filter(model_name != "anes") %>% 
+  left_join(
+    political_interest_cramer_df %>%
+      filter(model_name == "anes") %>%
+      select(variable, cramers_v_anes = cramers_v),
+    by = "variable"
+  ) 
+
+political_interest_cramer_df$model_name <- factor(political_interest_cramer_df$model_name, 
+                                levels = c('anes',"gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+pi_cramer <- political_interest_cramer_df %>%
+  ggplot(aes(x = cramers_v, y = variable)) +
+  geom_segment(
+    data = political_interest_line_data,
+    aes(x = cramers_v, xend = cramers_v_anes, y = variable, yend = variable, size = 1),
+    color = "grey", linetype = "dashed", alpha = 0.5
+  ) +
+  geom_point(aes(
+    color = model_name,
+    size = ifelse(model_name == "anes", 8, 6)
+  )) +
+  annotate("text", x = 0.55, y = 1, label = "Political Interests", 
+         hjust = 0.6, vjust = -19, size = 10, color = "black") +
+  labs(
+       x = "",
+       y = "") +
+  scale_size_identity() +
+  scale_color_manual(
+    name = "Model Name",
+    values = c(
+      "anes" = "black",
+      'gpt_3' = '#F8766D',
+      'gpt_3_5_turbo' = '#00BA38',
+      "gpt_4o_mini" = "#C77CFF",
+      "gpt_4" = "#619CFF")) +
+  theme_light() +
+  theme(
+        legend.title = element_blank(),
+        legend.position = c(0.85,0.5),
+        axis.text.x = element_text(size=20),
+        axis.text.y = element_text(size=20),
+        legend.text = element_text(size = 30),
+        strip.text = element_text(size = 20)) +
+  scale_x_continuous(limits = c(0, 0.6),breaks = seq(0, 0.6, by = 0.1))+
+  guides(color = guide_legend(override.aes = list(size = 6)))
+pi_cramer
+ggsave("./figures/pi_cramer.png", plot = pi_cramer, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+
+```{r}
+split_discuss_politics_2016 <- split(cramer_no_na_discuss_politics_2016, cramer_no_na_discuss_politics_2016$model_name)
+
+discuss_politics_cramer <- lapply(split_discuss_politics_2016, function(df) {
+  df <- select(df, -model_name, -voted, -id, -discuss_politics)
+  target_var <- df$gpt_coded_response
+  other_vars <- select(df, -gpt_coded_response)
+  result <- map_dbl(other_vars, ~ CramerV(target_var, .x))
+  tibble(variable = names(other_vars), cramers_v = result)
+})
+
+discuss_politics_cramer_anes <- cramer_no_na_discuss_politics_2016 %>% 
+  filter(model_name == 'gpt_3') %>% 
+  select(-model_name, -voted, -id, -gpt_coded_response)
+
+target_var <- discuss_politics_cramer_anes$discuss_politics
+other_vars <- discuss_politics_cramer_anes %>% select(-discuss_politics)
+result <- map_dbl(other_vars, ~ CramerV(target_var, .x))
+ 
+anes_discuss_politics <- tibble(
+  variable = names(other_vars),
+  cramers_v = result
+)
+
+discuss_politics_cramer$anes <- bind_rows(discuss_politics_cramer$anes, anes_discuss_politics)
+discuss_politics_cramer_df <- bind_rows(discuss_politics_cramer, .id = "model_name")
+```
+
+```{r}
+discuss_politics_line_data <- discuss_politics_cramer_df %>%
+  filter(model_name != "anes") %>% 
+  left_join(
+    discuss_politics_cramer_df %>%
+      filter(model_name == "anes") %>%
+      select(variable, cramers_v_anes = cramers_v),
+    by = "variable"
+  ) 
+
+discuss_politics_cramer_df$model_name <- factor(discuss_politics_cramer_df$model_name, 
+                                levels = c('anes',"gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+dp_cramer <- discuss_politics_cramer_df %>%
+  ggplot(aes(x = cramers_v, y = variable)) +
+  geom_segment(
+    data = discuss_politics_line_data,
+    aes(x = cramers_v, xend = cramers_v_anes, y = variable, yend = variable, size = 1),
+    color = "grey", linetype = "dashed", alpha = 0.5
+  ) +
+  geom_point(aes(
+    color = model_name,
+    size = ifelse(model_name == "anes", 8, 6)
+  )) +
+  labs(
+       x = "",
+       y = "") +
+  annotate("text", x = 0.55, y = 1, label = "Discuss Politics", 
+         hjust = 0.15, vjust = -19, size = 10, color = "black") +
+  scale_size_identity() +
+  scale_color_manual(
+    name = "Model Name",
+    values = c(
+      "anes" = "black",
+      'gpt_3' = '#F8766D',
+      'gpt_3_5_turbo' = '#00BA38',
+      "gpt_4o_mini" = "#C77CFF",
+      "gpt_4" = "#619CFF")) +
+  theme_light() +
+  theme(
+        legend.title = element_blank(),
+        legend.position = 'none',
+        axis.text.x = element_text(size=20),
+        axis.text.y = element_text(size=20),
+        legend.text = element_text(size = 30),
+        strip.text = element_text(size = 20)) +
+  scale_x_continuous(limits = c(0, 0.7),breaks = seq(0, 0.7, by = 0.1))+
+  guides(color = guide_legend(override.aes = list(size = 6)))
+
+dp_cramer
+ggsave("./figures/dp_cramer.png", plot = dp_cramer, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
+
+
+
+```{r}
+split_church_2016 <- split(cramer_no_na_church_goer_2016, cramer_no_na_church_goer_2016$model_name)
+
+church_goer_cramer <- lapply(split_church_2016, function(df) {
+  df <- select(df, -model_name, -voted, -id, -church_goer)
+  target_var <- df$gpt_coded_response
+  other_vars <- select(df, -gpt_coded_response)
+  result <- map_dbl(other_vars, ~ CramerV(target_var, .x))
+  tibble(variable = names(other_vars), cramers_v = result)
+})
+
+church_goer_cramer_gpt_3 <- cramer_no_na_church_goer_2016 %>% 
+  filter(model_name == 'gpt_3') %>% 
+  select(-model_name, -voted, -id, -gpt_coded_response)
+
+target_var <- church_goer_cramer_gpt_3$church_goer
+other_vars <- church_goer_cramer_gpt_3 %>% select(-church_goer)
+result <- map_dbl(other_vars, ~ CramerV(target_var, .x))
+ 
+anes_church_goer <- tibble(
+  variable = names(other_vars),
+  cramers_v = result
+)
+
+church_goer_cramer$anes <- bind_rows(church_goer_cramer$anes, anes_church_goer)
+church_goer_cramer_df <- bind_rows(church_goer_cramer, .id = "model_name")
+```
+
+
+```{r}
+church_goer_line_data <- church_goer_cramer_df %>%
+  filter(model_name != "anes") %>% 
+  left_join(
+    church_goer_cramer_df %>%
+      filter(model_name == "anes") %>%
+      select(variable, cramers_v_anes = cramers_v),
+    by = "variable"
+  ) 
+
+church_goer_cramer_df$model_name <- factor(church_goer_cramer_df$model_name, 
+                                levels = c('anes',"gpt_3", "gpt_3_5_turbo", "gpt_4o_mini", "gpt_4"))
+
+cg_cramer <- church_goer_cramer_df %>%
+  ggplot(aes(x = cramers_v, y = variable)) +
+  geom_segment(
+    data = church_goer_line_data,
+    aes(x = cramers_v, xend = cramers_v_anes, y = variable, yend = variable, size = 1),
+    color = "grey", linetype = "dashed", alpha = 0.5
+  ) +
+  geom_point(aes(
+    color = model_name,
+    size = ifelse(model_name == "anes", 8, 6)
+  )) +
+  annotate("text", x = 0.55, y = 1, label = "Church Goer", 
+         hjust = 0.15, vjust = -17, size = 10, color = "black") +
+  labs(
+       x = "Cramer's V",
+       y = "") +
+  scale_size_identity() +
+  scale_color_manual(
+    name = "Model Name",
+    values = c(
+      "anes" = "black",
+      'gpt_3' = '#F8766D',
+      'gpt_3_5_turbo' = '#00BA38',
+      "gpt_4o_mini" = "#C77CFF",
+      "gpt_4" = "#619CFF")) +
+  theme_light() +
+  theme(
+        legend.title = element_blank(),
+        legend.position = 'none',
+        axis.text.x = element_text(size=20),
+        axis.text.y = element_text(size=20),
+        legend.text = element_text(size = 30),
+        strip.text = element_text(size = 20),
+        axis.title.x = element_text(size = 24)) +
+  scale_x_continuous(limits = c(0, 0.7),breaks = seq(0, 0.7, by = 0.1))+
+  guides(color = guide_legend(override.aes = list(size = 6)))
+
+cg_cramer
+ggsave("./figures/cg_cramer.png", plot = cg_cramer, width = 15, height = 7, units = "in", dpi = 300)
+
+```
+
