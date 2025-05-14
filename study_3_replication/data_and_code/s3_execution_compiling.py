@@ -7,8 +7,6 @@ import pickle
 from tqdm import tqdm
 import os
 import concurrent.futures
-
-os.chdir('/Users/tbj/Graduate/QMSS/RA_work/replication_study_2/study_3/')
 from common import *
 
 openai.api_key = ""
