@@ -134,48 +134,92 @@ def redefine_variable(df_list,df_year,rf_short_long,features_2012_attend_church=
                  
     if rf_short_long == 'short':
        attend_church_2012_short = df_2012[[df_2012.columns[0], 'attend_church'] + features_2012_attend_church[:10]]
+       attend_church_2012_short = attend_church_2012_short.drop(rf_2012.index)
        discuss_politics_2012_short = df_2012[[df_2012.columns[0], 'discuss_politics'] + features_2012_discuss_politics[:10]]
+       discuss_politics_2012_short = discuss_politics_2012_short.drop(rf_2012.index)
        political_interest_2012_short = df_2012[[df_2012.columns[0], 'political_interest'] + features_2012_political_interest[:10]]
+       political_interest_2012_short = political_interest_2012_short.drop(rf_2012.index)
+       
+       
        attend_church_2016_short = df_2016[[df_2016.columns[0], 'attend_church'] + features_2016_attend_church[:10]]
+       attend_church_2016_short = attend_church_2016_short.drop(rf_2016.index)
        discuss_politics_2016_short = df_2016[[df_2016.columns[0], 'discuss_politics'] + features_2016_discuss_politics[:10]]
+       discuss_politics_2016_short = discuss_politics_2016_short.drop(rf_2016.index)
        political_interest_2016_short = df_2016[[df_2016.columns[0], 'political_interest'] + features_2016_political_interest[:10]]
+       political_interest_2016_short = political_interest_2016_short.drop(rf_2016.index)
+       
+       
        attend_church_2020_short = df_2020[[df_2020.columns[0], 'attend_church'] + features_2020_attend_church[:10]]
+       attend_church_2020_short = attend_church_2020_short.drop(rf_2020.index)
        discuss_politics_2020_short = df_2020[[df_2020.columns[0], 'discuss_politics'] + features_2020_discuss_politics[:10]]
+       discuss_politics_2020_short = discuss_politics_2020_short.drop(rf_2020.index)
        political_interest_2020_short = df_2020[[df_2020.columns[0], 'political_interest'] + features_2020_political_interest[:10]]
+       political_interest_2020_short = political_interest_2020_short.drop(rf_2020.index)
+      
        return [attend_church_2012_short, discuss_politics_2012_short, political_interest_2012_short,
             attend_church_2016_short, discuss_politics_2016_short, political_interest_2016_short,
             attend_church_2020_short, discuss_politics_2020_short, political_interest_2020_short]
        
 
     if rf_short_long == 'long':
-       attend_church_2012_short = df_2012[[df_2012.columns[0], 'attend_church'] + features_2012_attend_church]
-       discuss_politics_2012_short = df_2012[[df_2012.columns[0], 'discuss_politics'] + features_2012_discuss_politics]
-       political_interest_2012_short = df_2012[[df_2012.columns[0], 'political_interest'] + features_2012_political_interest]
-       attend_church_2016_short = df_2016[[df_2016.columns[0], 'attend_church'] + features_2016_attend_church]
-       discuss_politics_2016_short = df_2016[[df_2016.columns[0], 'discuss_politics'] + features_2016_discuss_politics]
-       political_interest_2016_short = df_2016[[df_2016.columns[0], 'political_interest'] + features_2016_political_interest]
-       attend_church_2020_short = df_2020[[df_2020.columns[0], 'attend_church'] + features_2020_attend_church]
-       discuss_politics_2020_short = df_2020[[df_2020.columns[0], 'discuss_politics'] + features_2020_discuss_politics]
-       political_interest_2020_short = df_2020[[df_2020.columns[0], 'political_interest'] + features_2020_political_interest]
-       return [attend_church_2012_short, discuss_politics_2012_short, political_interest_2012_short,
-            attend_church_2016_short, discuss_politics_2016_short, political_interest_2016_short,
-            attend_church_2020_short, discuss_politics_2020_short, political_interest_2020_short]
+       attend_church_2012_long = df_2012[[df_2012.columns[0], 'attend_church'] + features_2012_attend_church]
+       attend_church_2012_long = attend_church_2012_long.drop(rf_2012.index)
+       discuss_politics_2012_long = df_2012[[df_2012.columns[0], 'discuss_politics'] + features_2012_discuss_politics]
+       discuss_politics_2012_long = discuss_politics_2012_long.drop(rf_2012.index)
+       political_interest_2012_long = df_2012[[df_2012.columns[0], 'political_interest'] + features_2012_political_interest]
+       political_interest_2012_long = political_interest_2012_long.drop(rf_2012.index)
+       
+       attend_church_2016_long = df_2016[[df_2016.columns[0], 'attend_church'] + features_2016_attend_church]
+       attend_church_2016_long = attend_church_2016_long.drop(rf_2016.index)
+       discuss_politics_2016_long = df_2016[[df_2016.columns[0], 'discuss_politics'] + features_2016_discuss_politics]
+       discuss_politics_2016_long = discuss_politics_2016_long.drop(rf_2016.index)
+       political_interest_2016_long = df_2016[[df_2016.columns[0], 'political_interest'] + features_2016_political_interest]
+       political_interest_2016_long = political_interest_2016_long.drop(rf_2016.index)
+       
+       attend_church_2020_long = df_2020[[df_2020.columns[0], 'attend_church'] + features_2020_attend_church]
+       attend_church_2020_long = attend_church_2020_long.drop(rf_2020.index)
+       discuss_politics_2020_long = df_2020[[df_2020.columns[0], 'discuss_politics'] + features_2020_discuss_politics]
+       discuss_politics_2020_long = discuss_politics_2020_long.drop(rf_2020.index)
+       political_interest_2020_long = df_2020[[df_2020.columns[0], 'political_interest'] + features_2020_political_interest]
+       political_interest_2020_long = political_interest_2020_long.drop(rf_2020.index)
+
+       
+       return [attend_church_2012_long, discuss_politics_2012_long, political_interest_2012_long,
+            attend_church_2016_long, discuss_politics_2016_long, political_interest_2016_long,
+            attend_church_2020_long, discuss_politics_2020_long, political_interest_2020_long]
 
                 
 df_cleaned_list = redefine_variable(df_renamed_list, df_year,rf_short_long='rf')
 
-df_2012_cleaned,df_2016_cleaned,df_2020_cleaned =df_cleaned_list
 
-def split_rf(df_cleaned_list,df_year):
+rf_input = []
+#gpt_input = []
+for df in df_cleaned_list:
+    target_var = df.columns[1] 
+    
+    df_rf = df.groupby(target_var, group_keys=False).apply(lambda x: x.sample(frac=0.5, random_state=3))
+    
+   # df_gpt = df.drop(df_rf.index)
+    
+    rf_input.append(df_rf)
+    #gpt_input.append(df_gpt)
+
+
+#df_2012_cleaned,df_2016_cleaned,df_2020_cleaned =df_cleaned_list
+rf_2012,rf_2016,rf_2020 =rf_input
+
+
+def split_rf(rf_input,df_year):
     feature_importance = {}
-    for df, name in tqdm(zip(df_cleaned_list, df_year), total=len(df_cleaned_list), desc="processing years"):
+    for df, name in tqdm(zip(rf_input, df_year), total=len(rf_input), desc="processing years"):
         df = df.apply(pd.to_numeric, errors='coerce')
-        if name == '2012':
-            outcome_vars = ['political_interest', 'discuss_politics', 'attend_church']
-        elif name == '2016':
-            outcome_vars = ['political_interest', 'discuss_politics', 'attend_church']
-        elif name == '2020':
-            outcome_vars = ['political_interest', 'discuss_politics', 'attend_church']
+        outcome_vars = ['political_interest', 'discuss_politics', 'attend_church']
+      #  if name == '2012':
+       #     outcome_vars = ['political_interest', 'discuss_politics', 'attend_church']
+     #   elif name == '2016':
+        #    outcome_vars = ['political_interest', 'discuss_politics', 'attend_church']
+        #elif name == '2020':
+           # outcome_vars = ['political_interest', 'discuss_politics', 'attend_church']
 
         for outcome in outcome_vars:
             X = df.drop(columns=[df.columns[0], outcome])
@@ -218,7 +262,7 @@ def split_rf(df_cleaned_list,df_year):
             globals()[var_name] = features
 
             
-split_rf(df_cleaned_list,df_year)
+split_rf(rf_input,df_year)
 
 llm_short = redefine_variable(df_list,df_year,'short',features_2012_attend_church=features_2012_attend_church,
     features_2012_discuss_politics=features_2012_discuss_politics,
@@ -313,7 +357,6 @@ for i in range(len(llm_long)):
 
     llm_long_sampled.append(sampled_long)
     llm_short_sampled.append(sampled_short)
-
 
 
 

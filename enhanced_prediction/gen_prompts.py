@@ -5,7 +5,8 @@ Created on Fri May 16 03:00:38 2025
 
 @author: tbj
 """
-
+import os
+os.chdir('/Users/tbj/Graduate/QMSS/RA_work/enhance_predictability/')
 from variable_selection import *
 
 question_and_answer = {
@@ -242,6 +243,7 @@ def gen_qa_per_df(df_list):
 # generate prompts
 llm_short_for_gpt = gen_qa_per_df(llm_short_sampled)
 llm_long_for_gpt = gen_qa_per_df(llm_long_sampled)
+
 
 
 

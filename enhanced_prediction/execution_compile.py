@@ -6,6 +6,8 @@ Created on Fri May 16 03:45:36 2025
 @author: tbj
 """
 
+import os
+os.chdir('/Users/tbj/Graduate/QMSS/RA_work/enhance_predictability/')
 
 from gen_prompts import *
 import openai
@@ -13,49 +15,56 @@ import time
 import pandas as pd
 from tqdm import tqdm
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tenacity import retry, stop_after_attempt, wait_random_exponential, RetryError
+
 
 openai.api_key = ""
 
-def do_query(prompt, engine, max_tokens, tqdm_progress=None):
+def do_query(prompt, engine, max_tokens):
     messages = [{"role": "user", "content": prompt}]
-    try:
-        response = openai.chat.completions.create(
-            model=engine,
-            messages=messages,
-            temperature=1,
-            max_tokens=max_tokens,
-            top_p=1,
-            logprobs=True,
-            top_logprobs=5
-        )
-        text = response.choices[0].message.content.strip()
-        match = re.search(r'^\d+', text)
-        prediction = match.group(0) if match else text
-        if tqdm_progress:
-            tqdm_progress.update(1)  
-        return prediction, response
-    except openai.BadRequestError as e:
-        print(f"BadRequestError: {e}")
-        if tqdm_progress:
-            tqdm_progress.update(1) 
-        return None, None
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        if tqdm_progress:
-            tqdm_progress.update(1) 
-        return None, None
+    response = openai.chat.completions.create(
+        model=engine,
+        messages=messages,
+        temperature=0.7,
+        max_tokens=max_tokens,
+        top_p=1,
+        logprobs=True,
+        top_logprobs=5
+    )
+    text = response.choices[0].message.content.strip()
+    match = re.search(r'^\d+', text)
+    prediction = match.group(0) if match else text
+    return prediction, response
 
-def gen_response(prompt_dict, engine, max_tokens):
+# --- Parallel GPT calls using ThreadPoolExecutor ---
+def gen_response(prompt_dict, engine, max_tokens, max_workers=2):
     results = {}
+    
     for key, prompt_list in tqdm(prompt_dict.items(), desc="Processing keys"):
         key_responses = []
-        # Create a progress bar for individual prompts
-        with tqdm(total=len(prompt_list), desc=f"Processing {key}", leave=False) as pbar:
-            for prompt in prompt_list:
-                prediction, completion = do_query(prompt, engine, max_tokens, tqdm_progress=pbar)
+        
+        time.sleep(0.3)
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(do_query, prompt, engine, max_tokens): prompt
+                for prompt in prompt_list
+            }
+
+            for future in tqdm(as_completed(futures), total=len(prompt_list), desc=f"Processing {key}", leave=False):
+                try:
+                    prediction, completion = future.result()
+                except RetryError:
+                    prediction, completion = None, None
+                except Exception as e:
+                    print(f"Unexpected error: {e}")
+                    prediction, completion = None, None
+                
                 key_responses.append((prediction, completion))
-                time.sleep(0.5)  # Rate limiting
+
         results[key] = key_responses
+
     return results
 
 def predict_and_append(short_long, model_name, sampled_dfs, max_tokens):
@@ -87,6 +96,7 @@ def predict_and_append(short_long, model_name, sampled_dfs, max_tokens):
         df[model_name] = predictions
         df[f"{model_name}_completion"] = completions
         
+        
 #generate response for 10-variable predictions
 model_name = 'gpt-3.5-turbo'   #'gpt-4o-mini' #'gpt-3.5-turbo'
 short_long = llm_short_for_gpt
@@ -96,8 +106,7 @@ model_name = 'gpt-4o-mini'   #'gpt-4o-mini' #'gpt-3.5-turbo'
 predict_and_append(short_long, model_name, sampled_df_short_long,3)
 for i, df in enumerate(llm_short_sampled):
     df.to_csv(f'short_{i}.csv', index=False)
-
-
+    
 #generate response for 20-variable predictions
 model_name = 'gpt-3.5-turbo'   #'gpt-4o-mini' #'gpt-3.5-turbo'
 short_long = llm_long_for_gpt
@@ -108,8 +117,3 @@ predict_and_append(short_long, model_name, sampled_df_short_long,3)
 for i, df in enumerate(llm_long_sampled):
     df.to_csv(f'long_{i}.csv', index=False)
     
-    
-
-
-
-
