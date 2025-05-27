@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1_RYs2NSpYE7-CVf9jynu8Gr9NGBYLbaT
 """
 
-#pip install dspy
+#!pip install dspy
 import dspy
 from dspy import InputField, OutputField
 import pandas as pd
@@ -17,6 +17,8 @@ from sklearn.model_selection import train_test_split
 openai_api_key = ""
 lm = dspy.LM(model="gpt-4o-mini", api_key=openai_api_key)
 dspy.settings.configure(lm=lm)
+
+binary_political_interest = True
 
 question_and_answer = {
     'race': {
@@ -140,7 +142,7 @@ question_and_answer = {
         5:"Much worse."},
         },
     'finance_past': {
-        "template":"Relative to the current financial situation, the past situation was: XXX",
+        "template":"Relative to the past financial situation, the current situation is: XXX",
         "valmap":{
         1:'Much better.',
         2:"Somewhat better.",
@@ -204,7 +206,20 @@ question_and_answer = {
         },
     }
 
-pi_2012 = pd.read_csv('short_2.csv')
+if binary_political_interest:
+    question_and_answer['political_interest'] = {
+        "template": "Level of political interest: XXX",
+        "valmap": {
+            1: "Interested.",
+            2: "Not interested."
+        },
+    }
+
+if binary_political_interest:
+    pi_2012 = pd.read_csv('short_binary_political_interest_0.csv')
+else:
+    pi_2012 = pd.read_csv('short_2.csv')
+
 short_2012_political_interest_train, short_2012_political_interest_test = train_test_split(
     pi_2012, test_size=0.85, random_state=7, stratify=pi_2012["political_interest"])
 
@@ -219,45 +234,95 @@ class PoliticalInterest2012Signature(dspy.Signature):
     health = InputField(desc="Health status")
     life_satisfaction = InputField(desc="Life satisfaction")
     discuss_politics = InputField(desc="Whether discusses politics with family and friends")
-    finance_past = InputField(desc="Past financial situation relative to the present")
+    finance_past = InputField(desc="Present financial situation relative to the past")
     immigration_policy = InputField(desc="Attitude towards illegal immigrants")
-
     prediction = OutputField(desc="Predicted interest in politics: must be one of '1', '2', '3', or '4' (1=Very interested, 2=Somewhat interested, 3=Not very interested, 4=Not at all interested)")
+
+if binary_political_interest:
+  class PoliticalInterest2012Signature(dspy.Signature):
+    context = InputField(desc="ANES 2012 respondent's demographic and characteristics")
+
+    campaign_interest = InputField(desc="Interest in political campaigns")
+    age = InputField(desc="Respondent's age")
+    discuss_politics = InputField(desc="Whether discusses politics with family and friends")
+    voting_duty = InputField(desc="Sense of duty or choice in voting")
+    ideology = InputField(desc="Political ideology")
+    family_num = InputField(desc="Number of cohabiting family members")
+    health = InputField(desc="Health status")
+    trust = InputField(desc="Level of trust in other people")
+    life_satisfaction = InputField(desc="Life satisfaction")
+    election_impact = InputField(desc="Effectiveness of elections as a mechanism for holding governments accountable")
+
+    prediction = OutputField(desc="Predicted interest in politics: must be one of '1' or '2' (1=Interested, 2=Not interested)")
 
 def map_val(q, val):
     q_meta = question_and_answer[q]
     return q_meta["valmap"].get(val, str(val))
 
 train_set = []
-
-for _, row in short_2012_political_interest_train.iterrows():
-    example = dspy.Example(
+if binary_political_interest:
+  for _, row in short_2012_political_interest_train.iterrows():
+     example = dspy.Example(
         context="2012 ANES respondent",
-        age=f"{int(row['age'])} years old",
         campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+        age=f"{int(row['age'])} years old.",
+        discuss_politics=map_val("discuss_politics", row["discuss_politics"]),
         voting_duty=map_val("voting_duty", row["voting_duty"]),
         ideology=map_val("ideology", row["ideology"]),
         family_num=map_val("family_num", row["family_num"]),
         health=map_val("health", row["health"]),
+        trust=map_val("trust", row["trust"]),
         life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
-        discuss_politics=map_val("discuss_politics", row["discuss_politics"]),
-        finance_past=map_val("finance_past", row["finance_past"]),
-        immigration_policy=map_val("immigration_policy", row["immigration_policy"]),
+        election_impact=map_val("election_impact", row["election_impact"]),
         prediction=str(int(row["political_interest"]))
     ).with_inputs(
         "context",
-        "age",
         "campaign_interest",
+        "age",
+        "discuss_politics",
         "voting_duty",
         "ideology",
         "family_num",
         "health",
+        "trust",
         "life_satisfaction",
-        "discuss_politics",
-        "finance_past",
-        "immigration_policy"
+        "election_impact",
     )
-    train_set.append(example)
+
+     train_set.append(example)
+
+else:
+    for _, row in short_2012_political_interest_train.iterrows():
+        example = dspy.Example(
+            context="2012 ANES respondent",
+            age=f"{int(row['age'])} years old.",
+            campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+            voting_duty=map_val("voting_duty", row["voting_duty"]),
+            ideology=map_val("ideology", row["ideology"]),
+            family_num=map_val("family_num", row["family_num"]),
+            health=map_val("health", row["health"]),
+            life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
+            discuss_politics=map_val("discuss_politics", row["discuss_politics"]),
+            finance_past=map_val("finance_past", row["finance_past"]),
+            immigration_policy=map_val("immigration_policy", row["immigration_policy"]),
+            prediction=str(int(row["political_interest"]))
+        ).with_inputs(
+            "context",
+            "age",
+            "campaign_interest",
+            "voting_duty",
+            "ideology",
+            "family_num",
+            "health",
+            "life_satisfaction",
+            "discuss_politics",
+            "finance_past",
+            "immigration_policy"
+        )
+
+        train_set.append(example)
+
+train_set[:2]
 
 from dspy.teleprompt import BootstrapFewShotWithRandomSearch
 from dspy.teleprompt import MIPROv2
@@ -289,22 +354,27 @@ class PoliticalInterestPredictor(dspy.Module):
 def metric(example, prediction, trace=None):
     predicted = prediction.prediction
     # Validate prediction
-    if predicted not in ["1", "2", "3", "4"]:
+    if predicted not in ["1", "2"]:
         return 0.0
     # Compute weighted F1-score for a single example
-    return f1_score([example.prediction], [predicted], average="weighted", labels=["1", "2", "3", "4"])
+    return f1_score([example.prediction], [predicted], average="weighted", labels=["1", "2"])
 '''
 def metric(example, prediction, trace=None):
-    predicted = prediction.prediction
-    if predicted not in ["1", "2", "3", "4"]:
-        print(f"Invalid prediction: {predicted} for example: {example}")
-        return 10.0
+  predicted = prediction.prediction
+  if binary_political_interest:
+        valid_labels = ["1", "2"]
+  else:
+        valid_labels = ["1", "2", "3", "4"]
 
-    true_label = int(example.prediction)
-    pred_label = int(predicted)
+  if predicted not in valid_labels:
+      print(f"Invalid prediction: {predicted} for example: {example}")
+      return 10.0  # penalty for invalid
 
-    mae = abs(true_label - pred_label)
-    return -mae
+  true_label = int(example.prediction)
+  pred_label = int(predicted)
+
+  mae = abs(true_label - pred_label)
+  return -mae
 
 '''
 optimizer = BootstrapFewShotWithRandomSearch(
@@ -326,52 +396,95 @@ compiled_model = optimizer.compile(model,
                                    trainset=train_set,
                                    requires_permission_to_run = False)
 
-compiled_model.save("political_interest_2012_mipro.json")
-compiled_model.save("political_interest_2012_mipro.pkl")
-compiled_model
+if binary_political_interest:
+  compiled_model.save("political_interest_2012_binary_mipro.json")
+  compiled_model.save("political_interest_2012_binary_mipro.pkl")
+else:
+  compiled_model.save("political_interest_2012_mipro.json")
+  compiled_model.save("political_interest_2012_mipro.pkl")
 
 test_set = []
-for _, row in short_2012_political_interest_test.iterrows():
-    example = dspy.Example(
+if binary_political_interest:
+  for _, row in short_2012_political_interest_test.iterrows():
+     example = dspy.Example(
         context="2012 ANES respondent",
-        age=f"{int(row['age'])} years old",
         campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+        age=f"{int(row['age'])} years old.",
+        discuss_politics=map_val("discuss_politics", row["discuss_politics"]),
         voting_duty=map_val("voting_duty", row["voting_duty"]),
         ideology=map_val("ideology", row["ideology"]),
         family_num=map_val("family_num", row["family_num"]),
         health=map_val("health", row["health"]),
+        trust=map_val("trust", row["trust"]),
         life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
-        discuss_politics=map_val("discuss_politics", row["discuss_politics"]),
-        finance_past=map_val("finance_past", row["finance_past"]),
-        immigration_policy=map_val("immigration_policy", row["immigration_policy"]),
+        election_impact=map_val("election_impact", row["election_impact"]),
         prediction=str(int(row["political_interest"]))
     ).with_inputs(
         "context",
-        "age",
         "campaign_interest",
+        "age",
+        "discuss_politics",
         "voting_duty",
         "ideology",
         "family_num",
         "health",
+        "trust",
         "life_satisfaction",
-        "discuss_politics",
-        "finance_past",
-        "immigration_policy"
+        "election_impact",
     )
-    test_set.append(example)
+
+     test_set.append(example)
+
+else:
+    for _, row in short_2012_political_interest_test.iterrows():
+        example = dspy.Example(
+            context="2012 ANES respondent",
+            age=f"{int(row['age'])} years old.",
+            campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+            voting_duty=map_val("voting_duty", row["voting_duty"]),
+            ideology=map_val("ideology", row["ideology"]),
+            family_num=map_val("family_num", row["family_num"]),
+            health=map_val("health", row["health"]),
+            life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
+            discuss_politics=map_val("discuss_politics", row["discuss_politics"]),
+            finance_past=map_val("finance_past", row["finance_past"]),
+            immigration_policy=map_val("immigration_policy", row["immigration_policy"]),
+            prediction=str(int(row["political_interest"]))
+        ).with_inputs(
+            "context",
+            "age",
+            "campaign_interest",
+            "voting_duty",
+            "ideology",
+            "family_num",
+            "health",
+            "life_satisfaction",
+            "discuss_politics",
+            "finance_past",
+            "immigration_policy"
+        )
+
+        test_set.append(example)
+
+test_set[:2]
 
 predictions = []
-true_labels = []
-
 for example in tqdm(test_set, desc="Predicting"):
     pred = compiled_model(**example.inputs())
     predictions.append(pred.prediction)
-    true_labels.append(example.prediction)
 
 short_2012_political_interest_test['dspy_prediction'] =  predictions
-short_2012_political_interest_test.to_csv('dspy_prediction_2012.csv')
 
-pi_2016 = pd.read_csv('short_5.csv')
+if binary_political_interest:
+  short_2012_political_interest_test.to_csv('dspy_prediction_binary_2012.csv')
+else:
+  short_2012_political_interest_test.to_csv('dspy_prediction_2012.csv')
+
+if binary_political_interest:
+    pi_2016 = pd.read_csv('short_binary_political_interest_1.csv')
+else:
+    pi_2016 = pd.read_csv('short_5.csv')
+
 short_2016_political_interest_train, short_2016_political_interest_test = train_test_split(
     pi_2016, test_size=0.85, random_state=9, stratify=pi_2016["political_interest"])
 
@@ -385,19 +498,65 @@ class PoliticalInterest2016Signature(dspy.Signature):
     family_num = InputField(desc="Number of cohabiting family members")
     health = InputField(desc="Health status")
     life_satisfaction = InputField(desc="Life satisfaction")
-    finance_past = InputField(desc="Past financial situation relative to the present")
+    finance_past = InputField(desc="Present financial situation relative to the past")
     finance_next = InputField(desc="Expected future financial situation relative to the present")
     trust = InputField(desc="Level of trust in other people")
 
     prediction = OutputField(desc="Predicted interest in politics: must be one of '1', '2', '3', or '4' (1=Very interested, 2=Somewhat interested, 3=Not very interested, 4=Not at all interested)")
 
-def map_val(q, val):
-    q_meta = question_and_answer[q]
-    return q_meta["valmap"].get(val, str(val))
+if binary_political_interest:
+  class PoliticalInterest2016Signature(dspy.Signature):
+    context = InputField(desc="ANES 2016 respondent's demographic and characteristics")
+
+    campaign_interest = InputField(desc="Interest in political campaigns")
+    age = InputField(desc="Respondent's age")
+    discuss_politics = InputField(desc="Whether discusses politics with family and friends")
+    voting_duty = InputField(desc="Sense of duty or choice in voting")
+    ideology = InputField(desc="Political ideology")
+    family_num = InputField(desc="Number of cohabiting family members")
+    health = InputField(desc="Health status")
+    life_satisfaction = InputField(desc="Life satisfaction")
+    trust = InputField(desc="Level of trust in other people")
+    finance_past = InputField(desc="Present financial situation relative to the past")
+
+    prediction = OutputField(desc="Predicted interest in politics: must be one of '1' or '2' (1=Interested, 2=Not interested)")
+
+short_2016_political_interest_train.columns
 
 train_set = []
+if binary_political_interest:
+  for _, row in short_2016_political_interest_train.iterrows():
+     example = dspy.Example(
+        context="2016 ANES respondent",
+        campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+        age=f"{int(row['age'])} years old.",
+        discuss_politics=map_val("discuss_politics", row["discuss_politics"]),
+        voting_duty=map_val("voting_duty", row["voting_duty"]),
+        ideology=map_val("ideology", row["ideology"]),
+        family_num=map_val("family_num", row["family_num"]),
+        health=map_val("health", row["health"]),
+        life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
+        trust=map_val("trust", row["trust"]),
+        finance_past=map_val("finance_past", row["finance_past"]),
+        prediction=str(int(row["political_interest"]))
+    ).with_inputs(
+        "context",
+        "campaign_interest",
+        "age",
+        "discuss_politics",
+        "voting_duty",
+        "ideology",
+        "family_num",
+        "health",
+        "life_satisfaction",
+        "trust",
+        "finance_past",
+    )
 
-for _, row in short_2016_political_interest_train.iterrows():
+     train_set.append(example)
+
+else:
+  for _, row in short_2016_political_interest_train.iterrows():
     example = dspy.Example(
         context="2016 ANES respondent",
         age=f"{int(row['age'])} years old",
@@ -425,6 +584,8 @@ for _, row in short_2016_political_interest_train.iterrows():
         "trust"
     )
     train_set.append(example)
+
+train_set[:2]
 
 class PoliticalInterestPredictor(dspy.Module):
     def __init__(self):
@@ -440,12 +601,47 @@ compiled_model_2016 = optimizer.compile(model,
                                         trainset=train_set,
                                         requires_permission_to_run = False)
 
-compiled_model_2016.save("political_interest_2016_mipro.json")
-compiled_model_2016.save("political_interest_2016_mipro.pkl")
-compiled_model_2016
+if binary_political_interest:
+  compiled_model_2016.save("political_interest_2016_binary_mipro.json")
+  compiled_model_2016.save("political_interest_2016_binary_mipro.pkl")
+else:
+  compiled_model_2016.save("political_interest_2016_mipro.json")
+  compiled_model_2016.save("political_interest_2016_mipro.pkl")
 
 test_set = []
-for _, row in short_2016_political_interest_test.iterrows():
+if binary_political_interest:
+  for _, row in short_2016_political_interest_test.iterrows():
+     example = dspy.Example(
+        context="2016 ANES respondent",
+        campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+        age=f"{int(row['age'])} years old.",
+        discuss_politics=map_val("discuss_politics", row["discuss_politics"]),
+        voting_duty=map_val("voting_duty", row["voting_duty"]),
+        ideology=map_val("ideology", row["ideology"]),
+        family_num=map_val("family_num", row["family_num"]),
+        health=map_val("health", row["health"]),
+        life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
+        trust=map_val("trust", row["trust"]),
+        finance_past=map_val("finance_past", row["finance_past"]),
+        prediction=str(int(row["political_interest"]))
+    ).with_inputs(
+        "context",
+        "campaign_interest",
+        "age",
+        "discuss_politics",
+        "voting_duty",
+        "ideology",
+        "family_num",
+        "health",
+        "life_satisfaction",
+        "trust",
+        "finance_past",
+    )
+
+     test_set.append(example)
+
+else:
+  for _, row in short_2016_political_interest_test.iterrows():
     example = dspy.Example(
         context="2016 ANES respondent",
         age=f"{int(row['age'])} years old",
@@ -474,19 +670,28 @@ for _, row in short_2016_political_interest_test.iterrows():
     )
     test_set.append(example)
 
+test_set[:2]
+
 predictions_2016 = []
 
 for example in tqdm(test_set, desc="Predicting"):
     pred = compiled_model_2016(**example.inputs())
     predictions_2016.append(pred.prediction)
 
-short_2016_political_interest_test['dspy_prediction'] =  predictions_2016
-short_2016_political_interest_test.to_csv('dspy_prediction_2016.csv')
-predictions_2016
+short_2016_political_interest_test['dspy_prediction'] =  predictions
 
-pi_2020 = pd.read_csv('short_8.csv')
+if binary_political_interest:
+  short_2016_political_interest_test.to_csv('dspy_prediction_binary_2016.csv')
+else:
+  short_2016_political_interest_test.to_csv('dspy_prediction_2016.csv')
+
+if binary_political_interest:
+    pi_2020 = pd.read_csv('short_binary_political_interest_2.csv')
+else:
+    pi_2020 = pd.read_csv('short_8.csv')
+
 short_2020_political_interest_train, short_2020_political_interest_test = train_test_split(
-    pi_2020, test_size=0.85, random_state=7, stratify=pi_2020["political_interest"])
+    pi_2020, test_size=0.85, random_state=9, stratify=pi_2020["political_interest"])
 
 class PoliticalInterest2020Signature(dspy.Signature):
     context = InputField(desc="ANES 2020 respondent's demographic and characteristics")
@@ -497,20 +702,66 @@ class PoliticalInterest2020Signature(dspy.Signature):
     voting_duty = InputField(desc="Sense of duty or choice in voting")
     family_num = InputField(desc="Number of cohabiting family members")
     health = InputField(desc="Health status")
-    finance_past = InputField(desc="Past financial situation relative to the present")
+    finance_past = InputField(desc="Present financial situation relative to the past")
     life_satisfaction = InputField(desc="Life satisfaction")
     trust = InputField(desc="Level of trust in other people")
     finance_next = InputField(desc="Expected future financial situation relative to the present")
 
     prediction = OutputField(desc="Predicted interest in politics: must be one of '1', '2', '3', or '4' (1=Very interested, 2=Somewhat interested, 3=Not very interested, 4=Not at all interested)")
 
-def map_val(q, val):
-    q_meta = question_and_answer[q]
-    return q_meta["valmap"].get(val, str(val))
+if binary_political_interest:
+  class PoliticalInterest2020Signature(dspy.Signature):
+    context = InputField(desc="ANES 2020 respondent's demographic and characteristics")
+
+    campaign_interest = InputField(desc="Interest in political campaigns")
+    age = InputField(desc="Respondent's age")
+    voting_duty = InputField(desc="Sense of duty or choice in voting")
+    ideology = InputField(desc="Political ideology")
+    family_num = InputField(desc="Number of cohabiting family members")
+    health = InputField(desc="Health status")
+    finance_past = InputField(desc="Present financial situation relative to the past")
+    life_satisfaction = InputField(desc="Life satisfaction")
+    trust = InputField(desc="Level of trust in other people")
+    election_impact = InputField(desc="Effectiveness of elections as a mechanism for holding governments accountable")
+
+    prediction = OutputField(desc="Predicted interest in politics: must be one of '1' or '2' (1=Interested, 2=Not interested)")
+
+short_2020_political_interest_train[:2]
 
 train_set = []
+if binary_political_interest:
+  for _, row in short_2020_political_interest_train.iterrows():
+     example = dspy.Example(
+        context="2020 ANES respondent",
+        campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+        age=f"{int(row['age'])} years old.",
+        voting_duty=map_val("voting_duty", row["voting_duty"]),
+        ideology=map_val("ideology", row["ideology"]),
+        family_num=map_val("family_num", row["family_num"]),
+        health=map_val("health", row["health"]),
+        finance_past=map_val("finance_past", row["finance_past"]),
+        life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
+        trust=map_val("trust", row["trust"]),
+        election_impact=map_val("election_impact", row["election_impact"]),
+        prediction=str(int(row["political_interest"]))
+    ).with_inputs(
+        "context",
+        "campaign_interest",
+        "age",
+        "voting_duty",
+        "ideology",
+        "family_num",
+        "health",
+        "finance_past",
+        "life_satisfaction",
+        "trust",
+        "election_impact"
+    )
 
-for _, row in short_2020_political_interest_train.iterrows():
+     train_set.append(example)
+
+else:
+  for _, row in short_2020_political_interest_train.iterrows():
     example = dspy.Example(
         context="2020 ANES respondent",
         age=f"{int(row['age'])} years old",
@@ -539,6 +790,8 @@ for _, row in short_2020_political_interest_train.iterrows():
     )
     train_set.append(example)
 
+train_set[:2]
+
 class PoliticalInterestPredictor(dspy.Module):
     def __init__(self):
         super().__init__()
@@ -551,41 +804,75 @@ class PoliticalInterestPredictor(dspy.Module):
 model = PoliticalInterestPredictor()
 compiled_model_2020 = optimizer.compile(model, trainset=train_set,
                                         requires_permission_to_run = False)
-compiled_model_2020.save("political_interest_2020_model.json")
 
-compiled_model_2020.save("political_interest_2020_model.json")
-compiled_model_2020.save("political_interest_2020_model.pkl")
-compiled_model_2020
+if binary_political_interest:
+  compiled_model_2020.save("political_interest_2020_binary_mipro.json")
+  compiled_model_2020.save("political_interest_2020_binary_mipro.pkl")
+else:
+  compiled_model_2020.save("political_interest_2020_mipro.json")
+  compiled_model_2020.save("political_interest_2020_mipro.pkl")
 
 test_set = []
-for _, row in short_2020_political_interest_test.iterrows():
-    example = dspy.Example(
-        context="2020 ANES respondent",
-        age=f"{int(row['age'])} years old",
-        campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
-        voting_duty=map_val("voting_duty", row["voting_duty"]),
-        ideology=map_val("ideology", row["ideology"]),
-        family_num=map_val("family_num", row["family_num"]),
-        health=map_val("health", row["health"]),
-        finance_past=map_val("finance_past", row["finance_past"]),
-        life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
-        trust=map_val("trust", row["trust"]),
-        finance_next=map_val("finance_next", row["finance_next"]),
-        prediction=str(int(row["political_interest"]))
-    ).with_inputs(
-        "context",
-        "age",
-        "campaign_interest",
-        "voting_duty",
-        "ideology",
-        "family_num",
-        "health",
-        "finance_past",
-        "life_satisfaction",
-        "trust",
-        "finance_next"
-    )
-    test_set.append(example)
+if binary_political_interest:
+    for _, row in short_2020_political_interest_test.iterrows():
+        example = dspy.Example(
+            context="2020 ANES respondent",
+            campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+            age=f"{int(row['age'])} years old.",
+            voting_duty=map_val("voting_duty", row["voting_duty"]),
+            ideology=map_val("ideology", row["ideology"]),
+            family_num=map_val("family_num", row["family_num"]),
+            health=map_val("health", row["health"]),
+            finance_past=map_val("finance_past", row["finance_past"]),
+            life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
+            trust=map_val("trust", row["trust"]),
+            election_impact=map_val("election_impact", row["election_impact"]),
+            prediction=str(int(row["political_interest"]))
+        ).with_inputs(
+            "context",
+            "campaign_interest",
+            "age",
+            "voting_duty",
+            "ideology",
+            "family_num",
+            "health",
+            "finance_past",
+            "life_satisfaction",
+            "trust",
+            "election_impact"
+        )
+        test_set.append(example)
+
+else:
+    for _, row in short_2020_political_interest_test.iterrows():
+        example = dspy.Example(
+            context="2020 ANES respondent",
+            age=f"{int(row['age'])} years old",
+            campaign_interest=map_val("campaign_interest", row["campaign_interest"]),
+            voting_duty=map_val("voting_duty", row["voting_duty"]),
+            ideology=map_val("ideology", row["ideology"]),
+            family_num=map_val("family_num", row["family_num"]),
+            health=map_val("health", row["health"]),
+            finance_past=map_val("finance_past", row["finance_past"]),
+            life_satisfaction=map_val("life_satisfaction", row["life_satisfaction"]),
+            trust=map_val("trust", row["trust"]),
+            finance_next=map_val("finance_next", row["finance_next"]),
+            prediction=str(int(row["political_interest"]))
+        ).with_inputs(
+            "context",
+            "age",
+            "campaign_interest",
+            "voting_duty",
+            "ideology",
+            "family_num",
+            "health",
+            "finance_past",
+            "life_satisfaction",
+            "trust",
+            "finance_next"
+        )
+        test_set.append(example)
+test_set[:2]
 
 predictions_2020 = []
 for example in tqdm(test_set, desc="Predicting"):
@@ -593,5 +880,8 @@ for example in tqdm(test_set, desc="Predicting"):
     predictions_2020.append(pred.prediction)
 
 short_2020_political_interest_test['dspy_prediction'] =  predictions_2020
-short_2020_political_interest_test.to_csv('dspy_prediction_2020.csv')
-predictions_2020
+if binary_political_interest:
+  short_2020_political_interest_test.to_csv('dspy_prediction_binary_2020.csv')
+else:
+  short_2020_political_interest_test.to_csv('dspy_prediction_2020.csv')
+
